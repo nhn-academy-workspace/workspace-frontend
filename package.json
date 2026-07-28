@@ -1,0 +1,10 @@
+{
+  "name": "workspace-booking-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "description": "회의실 예약 시스템 프론트엔드 모듈 (React + Vite + TypeScript 예정 — 초기화 전 자리표시자)",
+  "scripts": {
+    "dev": "echo \"TODO: npx create-vite@latest . -- --template react-ts 로 초기화 후 dev 스크립트 연결\" && exit 1",
+    "build": "echo \"TODO: 초기화 후 build 스크립트 연결\" && exit 1"
+  }
+}
