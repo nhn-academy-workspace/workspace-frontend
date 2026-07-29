@@ -39,7 +39,7 @@
 }
 
 .timetable-content {
-  max-width: 640px;
+  max-width: 520px;
   margin: 0 auto;
   padding: 40px 32px 64px;
 }
@@ -49,7 +49,7 @@
   align-items: center;
   justify-content: center;
   gap: 20px;
-  margin-bottom: 32px;
+  margin-bottom: 20px;
 }
 
 .date-nav button {
@@ -77,6 +77,14 @@
   text-align: center;
 }
 
+.current-caption {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent-strong);
+  margin: 0 0 28px;
+}
+
 .state-message {
   color: var(--ink-soft);
   font-size: 14px;
@@ -89,51 +97,125 @@
 
 .empty-state {
   color: var(--ink-faint);
-  font-size: 14px;
+  font-size: 13px;
   text-align: center;
-  padding: 40px 0;
+  margin: 16px 0 0;
 }
 
-.entry-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* ---- timeline ---- */
+
+.timeline {
+  position: relative;
+  padding-bottom: 24px;
 }
 
-.entry-card {
+.hour-row {
+  position: absolute;
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
-  gap: 16px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--line);
-  border-radius: 10px;
-  padding: 14px 16px;
+  gap: 10px;
+  transform: translateY(-50%);
+}
+
+.hour-label {
+  flex: none;
+  width: 40px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+  text-align: right;
+}
+
+.hour-line {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.timeline-blocks {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 56px;
+  right: 0;
+}
+
+.timeline-block {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 8px;
+  border-left: 3px solid transparent;
+  padding: 5px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  overflow: hidden;
 }
 
 .entry-booking {
+  background: var(--accent-soft);
   border-left-color: var(--accent);
 }
 
 .entry-lock {
+  background: var(--lock-soft);
   border-left-color: var(--lock);
 }
 
-.entry-time {
-  font-variant-numeric: tabular-nums;
-  font-size: 13.5px;
+.block-time {
+  font-size: 10.5px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-soft);
-  flex: none;
-  width: 108px;
 }
 
-.entry-label {
-  font-size: 14.5px;
+.block-label {
+  font-size: 12.5px;
+  font-weight: 600;
   color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.now-line {
+  position: absolute;
+  left: 56px;
+  right: 0;
+  border-top: 2px solid var(--busy);
+  display: flex;
+  align-items: center;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.now-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--busy);
+  margin-left: -4px;
+  box-shadow: 0 0 0 3px var(--paper);
+  animation: now-pulse 2s ease-in-out infinite;
+}
+
+.now-time {
+  margin-left: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--busy);
+  background: var(--surface);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+@keyframes now-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px var(--paper); }
+  50% { box-shadow: 0 0 0 6px var(--busy-soft); }
 }
 
 @media (max-width: 640px) {
@@ -145,13 +227,12 @@
     padding: 28px 20px 48px;
   }
 
-  .entry-card {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
+  .hour-label {
+    width: 32px;
   }
 
-  .entry-time {
-    width: auto;
+  .timeline-blocks,
+  .now-line {
+    left: 46px;
   }
 }

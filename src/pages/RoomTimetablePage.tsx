@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { motion, useReducedMotion, AnimatePresence } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { getRoomBookings, getRooms, type Room, type TimetableEntry } from '../api/rooms'
 import './RoomTimetablePage.css'
+
+const START_HOUR = 9
+const END_HOUR = 18
+const HOUR_HEIGHT = 56 // px
+const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * HOUR_HEIGHT
+const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i)
 
 function toDateKey(date: Date): string {
   const y = date.getFullYear()
@@ -21,6 +27,21 @@ function formatTime(iso: string): string {
   return iso.slice(11, 16)
 }
 
+// 자정 기준 분 단위로 변환 (같은 날짜 문자열 안에서 시:분만 사용)
+function minutesOfDay(iso: string): number {
+  const h = Number(iso.slice(11, 13))
+  const m = Number(iso.slice(14, 16))
+  return h * 60 + m
+}
+
+function offsetFromStart(minutes: number): number {
+  return minutes - START_HOUR * 60
+}
+
+function entryLabel(entry: TimetableEntry): string {
+  return entry.type === 'BOOKING' ? `${entry.teamName} 사용` : `TA 업무 · ${entry.reason ?? '사유 없음'}`
+}
+
 export default function RoomTimetablePage() {
   const { roomId } = useParams<{ roomId: string }>()
   const navigate = useNavigate()
@@ -31,8 +52,10 @@ export default function RoomTimetablePage() {
   const [entries, setEntries] = useState<TimetableEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [now, setNow] = useState(() => new Date())
 
   const dateKey = useMemo(() => toDateKey(date), [date])
+  const isToday = dateKey === toDateKey(now)
 
   useEffect(() => {
     if (!roomId) return
@@ -58,6 +81,12 @@ export default function RoomTimetablePage() {
     }
   }, [roomId, dateKey])
 
+  // 현재 시각 표시선을 위해 1분마다 갱신
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(timer)
+  }, [])
+
   const shiftDay = (delta: number) => {
     setDate((prev) => {
       const next = new Date(prev)
@@ -65,6 +94,24 @@ export default function RoomTimetablePage() {
       return next
     })
   }
+
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const nowInRange = isToday && nowMinutes >= START_HOUR * 60 && nowMinutes <= END_HOUR * 60
+  const nowTop = nowInRange ? (offsetFromStart(nowMinutes) / 60) * HOUR_HEIGHT : null
+
+  const currentEntry = nowInRange
+    ? entries.find((e) => {
+        const s = offsetFromStart(minutesOfDay(e.startTime))
+        const en = offsetFromStart(minutesOfDay(e.endTime))
+        return offsetFromStart(nowMinutes) >= s && offsetFromStart(nowMinutes) < en
+      })
+    : undefined
+
+  const currentCaption = !nowInRange
+    ? null
+    : currentEntry
+      ? `지금 ${entryLabel(currentEntry)} 중`
+      : '지금 비어있음'
 
   return (
     <div className="timetable-page">
@@ -86,49 +133,58 @@ export default function RoomTimetablePage() {
           </button>
         </div>
 
+        {currentCaption && <p className="current-caption">{currentCaption}</p>}
+
         {loading && <p className="state-message">불러오는 중...</p>}
         {error && <p className="state-message is-error">{error}</p>}
 
         {!loading && !error && (
-          <AnimatePresence mode="wait">
-            {entries.length === 0 ? (
-              <motion.p
-                key="empty"
-                className="empty-state"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                이 날짜엔 예약된 일정이 없습니다.
-              </motion.p>
-            ) : (
-              <motion.ul
-                key={dateKey}
-                className="entry-list"
-                initial="hidden"
-                animate="visible"
-                variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
-              >
-                {entries.map((entry) => (
-                  <motion.li
-                    key={`${entry.type}-${entry.id}`}
-                    className={`entry-card entry-${entry.type.toLowerCase()}`}
-                    variants={{
-                      hidden: { opacity: 0, x: reduceMotion ? 0 : -12 },
-                      visible: { opacity: 1, x: 0 },
-                    }}
-                  >
-                    <span className="entry-time">
-                      {formatTime(entry.startTime)} – {formatTime(entry.endTime)}
-                    </span>
-                    <span className="entry-label">
-                      {entry.type === 'BOOKING' ? `${entry.teamName} 사용` : `TA 업무 · ${entry.reason ?? '사유 없음'}`}
-                    </span>
-                  </motion.li>
-                ))}
-              </motion.ul>
-            )}
-          </AnimatePresence>
+          <>
+            <div className="timeline" style={{ height: TOTAL_HEIGHT }}>
+              {HOURS.map((h, i) => (
+                <div key={h} className="hour-row" style={{ top: i * HOUR_HEIGHT }}>
+                  <span className="hour-label">{h}:00</span>
+                  <span className="hour-line" />
+                </div>
+              ))}
+
+              <div className="timeline-blocks">
+                {entries.map((entry, i) => {
+                  const startOffset = offsetFromStart(minutesOfDay(entry.startTime))
+                  const endOffset = offsetFromStart(minutesOfDay(entry.endTime))
+                  const top = (startOffset / 60) * HOUR_HEIGHT
+                  const height = Math.max(((endOffset - startOffset) / 60) * HOUR_HEIGHT, 20)
+
+                  return (
+                    <motion.div
+                      key={`${entry.type}-${entry.id}`}
+                      className={`timeline-block entry-${entry.type.toLowerCase()}`}
+                      style={{ top, height }}
+                      initial={{ opacity: 0, scaleY: reduceMotion ? 1 : 0.6 }}
+                      animate={{ opacity: 1, scaleY: 1 }}
+                      transition={{ delay: i * 0.05, duration: 0.3, ease: 'easeOut' }}
+                    >
+                      <span className="block-time">
+                        {formatTime(entry.startTime)}–{formatTime(entry.endTime)}
+                      </span>
+                      <span className="block-label">{entryLabel(entry)}</span>
+                    </motion.div>
+                  )
+                })}
+              </div>
+
+              {nowTop !== null && (
+                <div className="now-line" style={{ top: nowTop }}>
+                  <span className="now-dot" />
+                  <span className="now-time">
+                    {String(now.getHours()).padStart(2, '0')}:{String(now.getMinutes()).padStart(2, '0')}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {entries.length === 0 && <p className="empty-state">이 날짜엔 예약된 일정이 없습니다.</p>}
+          </>
         )}
       </main>
     </div>
