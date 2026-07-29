@@ -154,11 +154,12 @@ export default function RoomTimetablePage() {
                   const endOffset = offsetFromStart(minutesOfDay(entry.endTime))
                   const top = (startOffset / 60) * HOUR_HEIGHT
                   const height = Math.max(((endOffset - startOffset) / 60) * HOUR_HEIGHT, 20)
+                  const isPast = new Date(entry.endTime).getTime() <= now.getTime()
 
                   return (
                     <motion.div
                       key={`${entry.type}-${entry.id}`}
-                      className={`timeline-block entry-${entry.type.toLowerCase()}`}
+                      className={`timeline-block entry-${entry.type.toLowerCase()}${isPast ? ' is-past' : ''}`}
                       style={{ top, height }}
                       initial={{ opacity: 0, scaleY: reduceMotion ? 1 : 0.6 }}
                       animate={{ opacity: 1, scaleY: 1 }}

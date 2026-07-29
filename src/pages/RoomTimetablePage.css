@@ -166,6 +166,12 @@
   border-left-color: var(--lock);
 }
 
+.timeline-block.is-past {
+  opacity: 0.45;
+  filter: grayscale(0.7);
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
 .block-time {
   font-size: 10.5px;
   font-weight: 700;
