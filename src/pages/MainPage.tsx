@@ -1,29 +1,48 @@
+import { useEffect, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { getRooms, type Room } from '../api/rooms'
 import './MainPage.css'
-
-interface RoomStatus {
-  id: number
-  name: string
-  busy: boolean
-  detail: string
-}
-
-const rooms: RoomStatus[] = [
-  { id: 1, name: '회의실 1', busy: false, detail: '오늘 18:00까지 예약 가능' },
-  { id: 2, name: '회의실 2', busy: true, detail: '3팀 사용 중 · 13:00에 종료' },
-]
 
 const roleLabel: Record<string, string> = {
   STUDENT: '수강생',
   TA: 'TA',
 }
 
+const statusLabel: Record<Room['status'], string> = {
+  AVAILABLE: '사용 가능',
+  OCCUPIED: '사용 중',
+  LOCK: 'TA 업무 중',
+}
+
 export default function MainPage() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const reduceMotion = useReducedMotion()
+
+  const [rooms, setRooms] = useState<Room[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    getRooms()
+      .then((data) => {
+        if (!cancelled) setRooms(data)
+      })
+      .catch(() => {
+        if (!cancelled) setError('회의실 현황을 불러오지 못했습니다.')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleLogout = async () => {
     await logout()
@@ -64,30 +83,38 @@ export default function MainPage() {
           <p className="content-sub">지금 회의실 사용 현황을 확인하고 바로 예약해보세요.</p>
         </motion.div>
 
-        <section className="room-grid">
-          {rooms.map((room, i) => (
-            <motion.article
-              key={room.id}
-              className={`room-card ${room.busy ? 'is-busy' : 'is-open'}`}
-              initial={{ opacity: 0, y: reduceMotion ? 0 : 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 + i * 0.1, duration: 0.45, ease: 'easeOut' }}
-              whileHover={reduceMotion ? undefined : { y: -4 }}
-            >
-              <div className="room-card-top">
-                <h2>{room.name}</h2>
-                <span className="status-pill">
-                  <span className="status-dot" />
-                  {room.busy ? '사용 중' : '사용 가능'}
-                </span>
-              </div>
-              <p className="room-detail">{room.detail}</p>
-              <button type="button" className="room-action" disabled>
-                예약하기 (준비 중)
-              </button>
-            </motion.article>
-          ))}
-        </section>
+        {loading && <p className="state-message">불러오는 중...</p>}
+        {error && <p className="state-message is-error">{error}</p>}
+
+        {!loading && !error && (
+          <section className="room-grid">
+            {rooms.map((room, i) => (
+              <motion.article
+                key={room.id}
+                className={`room-card status-${room.status.toLowerCase()}`}
+                initial={{ opacity: 0, y: reduceMotion ? 0 : 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 + i * 0.1, duration: 0.45, ease: 'easeOut' }}
+                whileHover={reduceMotion ? undefined : { y: -4 }}
+                onClick={() => navigate(`/rooms/${room.id}`)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') navigate(`/rooms/${room.id}`)
+                }}
+              >
+                <div className="room-card-top">
+                  <h2>{room.name}</h2>
+                  <span className="status-pill">
+                    <span className="status-dot" />
+                    {statusLabel[room.status]}
+                  </span>
+                </div>
+                <p className="room-detail">탭해서 오늘 예약 현황 보기</p>
+              </motion.article>
+            ))}
+          </section>
+        )}
       </main>
     </div>
   )

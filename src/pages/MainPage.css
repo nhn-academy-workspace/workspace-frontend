@@ -97,10 +97,25 @@
   padding: 22px;
   box-shadow: var(--shadow-sm);
   transition: box-shadow 0.2s ease;
+  cursor: pointer;
 }
 
 .room-card:hover {
   box-shadow: var(--shadow-md);
+}
+
+.room-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.state-message {
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.state-message.is-error {
+  color: var(--busy);
 }
 
 .room-card-top {
@@ -127,14 +142,19 @@
   border-radius: 999px;
 }
 
-.is-open .status-pill {
+.status-available .status-pill {
   color: var(--ok);
   background: var(--ok-soft);
 }
 
-.is-busy .status-pill {
+.status-occupied .status-pill {
   color: var(--busy);
   background: var(--busy-soft);
+}
+
+.status-lock .status-pill {
+  color: var(--lock);
+  background: var(--lock-soft);
 }
 
 .status-dot {
@@ -147,19 +167,7 @@
 .room-detail {
   color: var(--ink-soft);
   font-size: 14px;
-  margin: 0 0 18px;
-}
-
-.room-action {
-  width: 100%;
-  border: 1px solid var(--line);
-  background: var(--paper);
-  color: var(--ink-faint);
-  font-size: 13.5px;
-  font-weight: 600;
-  padding: 10px;
-  border-radius: 10px;
-  cursor: not-allowed;
+  margin: 0;
 }
 
 @media (max-width: 640px) {
