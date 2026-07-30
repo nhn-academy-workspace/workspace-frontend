@@ -4,7 +4,6 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { getRooms, type Room } from '../api/rooms'
 import { getMyTeamRoster, type TeamMember } from '../api/teams'
 import { createBooking, BookingError } from '../api/bookings'
-import { useAuth } from '../context/AuthContext'
 import './NewBookingPage.css'
 
 const START_HOUR = 9
@@ -45,7 +44,6 @@ function addMinutes(hhmm: string, minutes: number): string {
 export default function NewBookingPage() {
   const { roomId } = useParams<{ roomId: string }>()
   const navigate = useNavigate()
-  const { user } = useAuth()
   const reduceMotion = useReducedMotion()
 
   const [room, setRoom] = useState<Room | null>(null)
