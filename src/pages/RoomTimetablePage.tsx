@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { getRoomBookings, getRooms, type Room, type TimetableEntry } from '../api/rooms'
+import { useAuth } from '../context/AuthContext'
 import './RoomTimetablePage.css'
 
 const START_HOUR = 9
@@ -46,6 +47,7 @@ export default function RoomTimetablePage() {
   const { roomId } = useParams<{ roomId: string }>()
   const navigate = useNavigate()
   const reduceMotion = useReducedMotion()
+  const { user } = useAuth()
 
   const [date, setDate] = useState(() => new Date())
   const [room, setRoom] = useState<Room | null>(null)
@@ -134,6 +136,16 @@ export default function RoomTimetablePage() {
         </div>
 
         {currentCaption && <p className="current-caption">{currentCaption}</p>}
+
+        {isToday && user?.role === 'STUDENT' && (
+          <button
+            type="button"
+            className="new-booking-cta"
+            onClick={() => navigate(`/rooms/${roomId}/book`)}
+          >
+            + 새 예약
+          </button>
+        )}
 
         {loading && <p className="state-message">불러오는 중...</p>}
         {error && <p className="state-message is-error">{error}</p>}
