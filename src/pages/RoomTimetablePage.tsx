@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { getRoomBookings, getRooms, type Room, type TimetableEntry } from '../api/rooms'
 import { getMyTeamRoster, type TeamMember } from '../api/teams'
-import { createBooking, BookingError } from '../api/bookings'
+import { createBooking, extendBooking, earlyReturnBooking, BookingError } from '../api/bookings'
 import { useAuth } from '../context/AuthContext'
 import './RoomTimetablePage.css'
 
@@ -22,6 +22,8 @@ const MINOR_TICKS = Array.from({ length: TOTAL_MINUTES / SLOT_MINUTES }, (_, i) 
 )
 const MAX_DURATION = 120 // 최대 2시간
 const MIN_PARTICIPANTS = 4
+const EXTEND_STEP = 15 // 연장 단위(분)
+const EXTEND_WINDOW = 15 // 종료 몇 분 전부터 연장 가능한지
 
 function toDateKey(date: Date): string {
   const y = date.getFullYear()
@@ -60,6 +62,13 @@ function minutesToHHMM(absoluteMinutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
+function addMinutesIso(iso: string, minutes: number): string {
+  const d = new Date(iso)
+  d.setMinutes(d.getMinutes() + minutes)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`
+}
+
 function entryLabel(entry: TimetableEntry): string {
   return entry.type === 'BOOKING' ? `${entry.teamName} 사용` : `TA 업무 · ${entry.reason ?? '사유 없음'}`
 }
@@ -92,6 +101,9 @@ export default function RoomTimetablePage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const [actionSubmitting, setActionSubmitting] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const dateKey = useMemo(() => toDateKey(date), [date])
   const isToday = dateKey === toDateKey(now)
@@ -255,6 +267,43 @@ export default function RoomTimetablePage() {
 
   const currentCaption = !nowInRange ? null : currentEntry ? `지금 ${entryLabel(currentEntry)} 중` : '지금 비어있음'
 
+  const isMyCurrentBooking =
+    user?.role === 'STUDENT' && currentEntry?.type === 'BOOKING' && currentEntry.teamName === user.teamName
+
+  const canExtend =
+    isMyCurrentBooking &&
+    !!currentEntry &&
+    minutesOfDay(currentEntry.endTime) - nowMinutes <= EXTEND_WINDOW &&
+    minutesOfDay(currentEntry.endTime) + EXTEND_STEP <= END_HOUR * 60
+
+  const handleExtend = async () => {
+    if (!currentEntry) return
+    setActionSubmitting(true)
+    setActionError(null)
+    try {
+      await extendBooking(currentEntry.id, addMinutesIso(currentEntry.endTime, EXTEND_STEP))
+      await fetchEntries()
+    } catch (err) {
+      setActionError(err instanceof BookingError ? err.message : '연장에 실패했습니다. 잠시 후 다시 시도해주세요.')
+    } finally {
+      setActionSubmitting(false)
+    }
+  }
+
+  const handleEarlyReturn = async () => {
+    if (!currentEntry) return
+    setActionSubmitting(true)
+    setActionError(null)
+    try {
+      await earlyReturnBooking(currentEntry.id)
+      await fetchEntries()
+    } catch (err) {
+      setActionError(err instanceof BookingError ? err.message : '조기 반납에 실패했습니다. 잠시 후 다시 시도해주세요.')
+    } finally {
+      setActionSubmitting(false)
+    }
+  }
+
   const canConfirm = !!draftRange && selectedIds.length >= MIN_PARTICIPANTS && !submitting
 
   return (
@@ -278,6 +327,20 @@ export default function RoomTimetablePage() {
         </div>
 
         {currentCaption && <p className="current-caption">{currentCaption}</p>}
+
+        {isMyCurrentBooking && (
+          <div className="my-booking-actions">
+            {canExtend && (
+              <button type="button" onClick={handleExtend} disabled={actionSubmitting}>
+                +{EXTEND_STEP}분 연장
+              </button>
+            )}
+            <button type="button" className="early-return-button" onClick={handleEarlyReturn} disabled={actionSubmitting}>
+              조기 반납
+            </button>
+          </div>
+        )}
+        {actionError && <p className="state-message is-error">{actionError}</p>}
 
         {user?.role === 'STUDENT' && isToday && isBeforeOpen && (
           <p className="state-message is-error">오늘 예약은 08:30부터 신청할 수 있습니다.</p>
