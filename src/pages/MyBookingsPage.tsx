@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, useReducedMotion } from 'framer-motion'
-import { getRooms } from '../api/rooms'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { getRooms, getRoomBookings } from '../api/rooms'
 import { getMyTeamBookingsToday, describeBookingTiming, formatMinutes, type MyBookingEntry } from '../api/myBooking'
 import { extendBooking, earlyReturnBooking, BookingError } from '../api/bookings'
 import { useAuth } from '../context/AuthContext'
 import './MyBookingsPage.css'
 
-const END_HOUR = 18
-const EXTEND_STEP = 15
+const CLOSE_MINUTES = 18 * 60
+const DAILY_CAP_MINUTES = 240
 const EXTEND_WINDOW = 15
+const DURATION_OPTIONS = [15, 30, 45, 60]
 
 function formatTime(iso: string): string {
   return iso.slice(11, 16)
@@ -48,6 +49,10 @@ export default function MyBookingsPage() {
   const [actionSubmitting, setActionSubmitting] = useState<number | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
+  const [extendingId, setExtendingId] = useState<number | null>(null)
+  const [extendMax, setExtendMax] = useState<number | null>(null)
+  const [extendLoading, setExtendLoading] = useState(false)
+
   const fetchBookings = () => {
     if (!user?.teamName) return Promise.resolve()
     setLoading(true)
@@ -69,11 +74,54 @@ export default function MyBookingsPage() {
     return () => clearInterval(timer)
   }, [])
 
-  const handleExtend = async (entry: MyBookingEntry) => {
+  const closeExtend = () => {
+    setExtendingId(null)
+    setExtendMax(null)
+  }
+
+  const openExtend = async (entry: MyBookingEntry) => {
+    if (extendingId === entry.id) {
+      closeExtend()
+      return
+    }
+    setExtendingId(entry.id)
+    setExtendMax(null)
+    setActionError(null)
+    setExtendLoading(true)
+
+    try {
+      const roomEntries = await getRoomBookings(entry.roomId, toDateKey(new Date()))
+      const entryEnd = minutesOfDay(entry.endTime)
+
+      let maxEndAbs = CLOSE_MINUTES
+      for (const e of roomEntries) {
+        if (e.id === entry.id && e.type === entry.type) continue
+        const s = minutesOfDay(e.startTime)
+        if (s > entryEnd && s < maxEndAbs) maxEndAbs = s
+      }
+
+      const usedToday = bookings.reduce(
+        (sum, b) => sum + (minutesOfDay(b.endTime) - minutesOfDay(b.startTime)),
+        0,
+      )
+      const capRemaining = Math.max(DAILY_CAP_MINUTES - usedToday, 0)
+      maxEndAbs = Math.min(maxEndAbs, entryEnd + capRemaining)
+
+      const rawMax = maxEndAbs - entryEnd
+      setExtendMax(Math.max(Math.floor(rawMax / 15) * 15, 0))
+    } catch {
+      setExtendMax(0)
+    } finally {
+      setExtendLoading(false)
+    }
+  }
+
+  const confirmExtend = async (entry: MyBookingEntry, minutes: number) => {
     setActionSubmitting(entry.id)
     setActionError(null)
     try {
-      await extendBooking(entry.id, addMinutesIso(entry.endTime, EXTEND_STEP))
+      await extendBooking(entry.id, addMinutesIso(entry.endTime, minutes))
+      closeExtend()
       await fetchBookings()
     } catch (err) {
       setActionError(err instanceof BookingError ? err.message : '연장에 실패했습니다. 잠시 후 다시 시도해주세요.')
@@ -87,6 +135,7 @@ export default function MyBookingsPage() {
     setActionError(null)
     try {
       await earlyReturnBooking(entry.id)
+      closeExtend()
       await fetchBookings()
     } catch (err) {
       setActionError(err instanceof BookingError ? err.message : '조기 반납에 실패했습니다. 잠시 후 다시 시도해주세요.')
@@ -122,11 +171,9 @@ export default function MyBookingsPage() {
               <div className="my-bookings-list">
                 {bookings.map((entry, i) => {
                   const timing = describeBookingTiming(entry, now)
-                  const canExtend =
-                    timing.phase === 'ongoing' &&
-                    timing.minutes <= EXTEND_WINDOW &&
-                    minutesOfDay(entry.endTime) + EXTEND_STEP <= END_HOUR * 60
+                  const canOfferExtend = timing.phase === 'ongoing' && timing.minutes <= EXTEND_WINDOW
                   const submitting = actionSubmitting === entry.id
+                  const isExtending = extendingId === entry.id
 
                   return (
                     <motion.article
@@ -151,9 +198,9 @@ export default function MyBookingsPage() {
 
                       {timing.phase === 'ongoing' && (
                         <div className="booking-actions">
-                          {canExtend && (
-                            <button type="button" onClick={() => handleExtend(entry)} disabled={submitting}>
-                              +{EXTEND_STEP}분 연장
+                          {canOfferExtend && (
+                            <button type="button" onClick={() => openExtend(entry)} disabled={submitting}>
+                              연장
                             </button>
                           )}
                           <button
@@ -166,6 +213,37 @@ export default function MyBookingsPage() {
                           </button>
                         </div>
                       )}
+
+                      <AnimatePresence>
+                        {isExtending && (
+                          <motion.div
+                            className="extend-options"
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.2, ease: 'easeOut' }}
+                          >
+                            {extendLoading && <span className="extend-hint">확인 중...</span>}
+                            {!extendLoading && extendMax !== null && extendMax < 15 && (
+                              <span className="extend-hint">지금은 더 연장할 수 있는 시간이 없어요.</span>
+                            )}
+                            {!extendLoading &&
+                              extendMax !== null &&
+                              extendMax >= 15 &&
+                              DURATION_OPTIONS.map((m) => (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  className="chip"
+                                  disabled={m > extendMax || submitting}
+                                  onClick={() => confirmExtend(entry, m)}
+                                >
+                                  +{m}분
+                                </button>
+                              ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </motion.article>
                   )
                 })}
