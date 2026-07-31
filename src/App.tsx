@@ -3,6 +3,7 @@ import LoginPage from './pages/LoginPage'
 import MainPage from './pages/MainPage'
 import RoomTimetablePage from './pages/RoomTimetablePage'
 import MyBookingsPage from './pages/MyBookingsPage'
+import BookingHistoryPage from './pages/BookingHistoryPage'
 import { RequireAuth } from './components/RequireAuth'
 
 function App() {
@@ -30,6 +31,14 @@ function App() {
         element={
           <RequireAuth>
             <MyBookingsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/bookings/history"
+        element={
+          <RequireAuth>
+            <BookingHistoryPage />
           </RequireAuth>
         }
       />
