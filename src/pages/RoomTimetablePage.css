@@ -85,22 +85,11 @@
   margin: 0 0 28px;
 }
 
-.new-booking-cta {
-  display: block;
-  margin: 0 auto 28px;
-  border: none;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-size: 13.5px;
-  font-weight: 700;
-  padding: 10px 20px;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.new-booking-cta:hover {
-  background: var(--accent-strong);
+.drag-hint {
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  margin: 0 0 20px;
 }
 
 .state-message {
@@ -152,12 +141,41 @@
   background: var(--line);
 }
 
+.minor-line {
+  position: absolute;
+  left: 56px;
+  right: 0;
+  height: 1px;
+  background: var(--line);
+  opacity: 0.4;
+}
+
 .timeline-blocks {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 56px;
   right: 0;
+}
+
+.hover-slot {
+  position: absolute;
+  left: 56px;
+  right: 0;
+  background: var(--accent-soft);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.drag-track {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 56px;
+  right: 0;
+  z-index: 8;
+  cursor: crosshair;
+  touch-action: none;
 }
 
 .timeline-block {
@@ -188,6 +206,18 @@
   opacity: 0.45;
   filter: grayscale(0.7);
   transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+.draft-block {
+  background: var(--accent-soft);
+  border: 2px dashed var(--accent);
+  border-left-width: 2px;
+  z-index: 7;
+}
+
+.draft-block .block-label,
+.draft-block .block-time {
+  color: var(--accent-strong);
 }
 
 .block-time {
@@ -242,6 +272,138 @@
   50% { box-shadow: 0 0 0 6px var(--busy-soft); }
 }
 
+/* ---- 예약 확정 패널 ---- */
+
+.confirm-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
+}
+
+.confirm-panel-inner {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 20px 32px calc(20px + env(safe-area-inset-bottom, 0px));
+}
+
+.confirm-range {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.confirm-duration {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-faint);
+}
+
+.confirm-label {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.member-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.member-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 9px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.member-chip input {
+  accent-color: var(--accent);
+}
+
+.member-chip.is-selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.member-chip.is-self {
+  cursor: default;
+}
+
+.self-badge {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.form-error {
+  background: var(--busy-soft);
+  color: var(--busy);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.cancel-button,
+.confirm-button {
+  flex: 1;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.cancel-button {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+}
+
+.cancel-button:hover:not(:disabled) {
+  background: var(--line);
+}
+
+.confirm-button {
+  border: none;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.confirm-button:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.confirm-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 @media (max-width: 640px) {
   .timetable-header {
     padding: 14px 20px;
@@ -256,7 +418,14 @@
   }
 
   .timeline-blocks,
-  .now-line {
+  .now-line,
+  .drag-track,
+  .hover-slot,
+  .minor-line {
     left: 46px;
+  }
+
+  .confirm-panel-inner {
+    padding: 16px 20px calc(16px + env(safe-area-inset-bottom, 0px));
   }
 }

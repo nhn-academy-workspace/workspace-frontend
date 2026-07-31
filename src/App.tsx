@@ -2,7 +2,6 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
 import MainPage from './pages/MainPage'
 import RoomTimetablePage from './pages/RoomTimetablePage'
-import NewBookingPage from './pages/NewBookingPage'
 import { RequireAuth } from './components/RequireAuth'
 
 function App() {
@@ -22,14 +21,6 @@ function App() {
         element={
           <RequireAuth>
             <RoomTimetablePage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/rooms/:roomId/book"
-        element={
-          <RequireAuth>
-            <NewBookingPage />
           </RequireAuth>
         }
       />

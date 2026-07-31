@@ -1,15 +1,27 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { getRoomBookings, getRooms, type Room, type TimetableEntry } from '../api/rooms'
+import { getMyTeamRoster, type TeamMember } from '../api/teams'
+import { createBooking, BookingError } from '../api/bookings'
 import { useAuth } from '../context/AuthContext'
 import './RoomTimetablePage.css'
 
 const START_HOUR = 9
 const END_HOUR = 18
-const HOUR_HEIGHT = 56 // px
+const OPEN_HOUR = 8
+const OPEN_MINUTE = 30
+const SLOT_MINUTES = 15
+const SLOT_HEIGHT = 32 // px per 15분
+const HOUR_HEIGHT = SLOT_HEIGHT * (60 / SLOT_MINUTES)
+const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60
 const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * HOUR_HEIGHT
 const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i)
+const MINOR_TICKS = Array.from({ length: TOTAL_MINUTES / SLOT_MINUTES }, (_, i) => i * SLOT_MINUTES).filter(
+  (m) => m % 60 !== 0,
+)
+const MAX_DURATION = 120 // 최대 2시간
+const MIN_PARTICIPANTS = 4
 
 function toDateKey(date: Date): string {
   const y = date.getFullYear()
@@ -28,7 +40,6 @@ function formatTime(iso: string): string {
   return iso.slice(11, 16)
 }
 
-// 자정 기준 분 단위로 변환 (같은 날짜 문자열 안에서 시:분만 사용)
 function minutesOfDay(iso: string): number {
   const h = Number(iso.slice(11, 13))
   const m = Number(iso.slice(14, 16))
@@ -39,8 +50,23 @@ function offsetFromStart(minutes: number): number {
   return minutes - START_HOUR * 60
 }
 
+function offsetToTop(offset: number): number {
+  return (offset / 60) * HOUR_HEIGHT
+}
+
+function minutesToHHMM(absoluteMinutes: number): string {
+  const h = Math.floor(absoluteMinutes / 60)
+  const m = absoluteMinutes % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
 function entryLabel(entry: TimetableEntry): string {
   return entry.type === 'BOOKING' ? `${entry.teamName} 사용` : `TA 업무 · ${entry.reason ?? '사유 없음'}`
+}
+
+interface DraftRange {
+  start: number // offset minutes (0 = START_HOUR)
+  end: number
 }
 
 export default function RoomTimetablePage() {
@@ -56,34 +82,62 @@ export default function RoomTimetablePage() {
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(() => new Date())
 
+  const trackRef = useRef<HTMLDivElement>(null)
+  const [dragging, setDragging] = useState(false)
+  const [draftRange, setDraftRange] = useState<DraftRange | null>(null)
+  const [hoverSlot, setHoverSlot] = useState<number | null>(null)
+
+  const [roster, setRoster] = useState<TeamMember[]>([])
+  const [myMemberId, setMyMemberId] = useState<number | null>(null)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
   const dateKey = useMemo(() => toDateKey(date), [date])
   const isToday = dateKey === toDateKey(now)
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const isBeforeOpen = now.getHours() < OPEN_HOUR || (now.getHours() === OPEN_HOUR && now.getMinutes() < OPEN_MINUTE)
+  const canBook = user?.role === 'STUDENT' && isToday && !isBeforeOpen
 
-  useEffect(() => {
-    if (!roomId) return
-    let cancelled = false
+  const fetchEntries = () => {
+    if (!roomId) return Promise.resolve()
     setLoading(true)
     setError(null)
-
-    Promise.all([getRooms(), getRoomBookings(Number(roomId), dateKey)])
+    return Promise.all([getRooms(), getRoomBookings(Number(roomId), dateKey)])
       .then(([rooms, bookings]) => {
-        if (cancelled) return
         setRoom(rooms.find((r) => r.id === Number(roomId)) ?? null)
         setEntries([...bookings].sort((a, b) => a.startTime.localeCompare(b.startTime)))
       })
       .catch(() => {
-        if (!cancelled) setError('예약 현황을 불러오지 못했습니다.')
+        setError('예약 현황을 불러오지 못했습니다.')
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        setLoading(false)
       })
+  }
 
+  useEffect(() => {
+    setDraftRange(null)
+    fetchEntries()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId, dateKey])
+
+  useEffect(() => {
+    if (user?.role !== 'STUDENT') return
+    let cancelled = false
+    getMyTeamRoster()
+      .then((data) => {
+        if (cancelled) return
+        setRoster(data.members)
+        setMyMemberId(data.memberId)
+        setSelectedIds([data.memberId])
+      })
+      .catch(() => {})
     return () => {
       cancelled = true
     }
-  }, [roomId, dateKey])
+  }, [user?.role])
 
-  // 현재 시각 표시선을 위해 1분마다 갱신
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60_000)
     return () => clearInterval(timer)
@@ -97,9 +151,99 @@ export default function RoomTimetablePage() {
     })
   }
 
-  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  // 기존 예약/락을 offset-분 구간으로 변환
+  const occupied = useMemo(
+    () =>
+      entries.map((e) => ({
+        start: offsetFromStart(minutesOfDay(e.startTime)),
+        end: offsetFromStart(minutesOfDay(e.endTime)),
+      })),
+    [entries],
+  )
+
+  const isSlotFree = (start: number, end: number) =>
+    occupied.every((o) => end <= o.start || start >= o.end)
+
+  // start에서 시작해서 최대한 늘릴 수 있는 끝 지점(다음 예약/락, 2시간 상한, 마감시간 중 가장 빠른 것)
+  const clampEnd = (start: number, candidateEnd: number) => {
+    let maxEnd = Math.min(candidateEnd, start + MAX_DURATION, TOTAL_MINUTES)
+    for (const o of occupied) {
+      if (o.start > start && o.start < maxEnd) maxEnd = o.start
+    }
+    return Math.max(maxEnd, start + SLOT_MINUTES)
+  }
+
+  const offsetFromPointer = (clientY: number) => {
+    const rect = trackRef.current?.getBoundingClientRect()
+    if (!rect) return 0
+    const relY = clientY - rect.top
+    const minutes = (relY / HOUR_HEIGHT) * 60
+    return Math.min(Math.max(Math.floor(minutes / SLOT_MINUTES) * SLOT_MINUTES, 0), TOTAL_MINUTES - SLOT_MINUTES)
+  }
+
+  const isPastSlot = (start: number) => isToday && start + START_HOUR * 60 < nowMinutes
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (!canBook) return
+    const slot = offsetFromPointer(e.clientY)
+    if (isPastSlot(slot) || !isSlotFree(slot, slot + SLOT_MINUTES)) return
+    ;(e.target as Element).setPointerCapture(e.pointerId)
+    setDragging(true)
+    setSubmitError(null)
+    setDraftRange({ start: slot, end: slot + SLOT_MINUTES })
+  }
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    const slot = offsetFromPointer(e.clientY)
+    if (!dragging) {
+      setHoverSlot(canBook && !isPastSlot(slot) && isSlotFree(slot, slot + SLOT_MINUTES) ? slot : null)
+      return
+    }
+    setDraftRange((prev) => {
+      if (!prev) return prev
+      const candidateEnd = slot >= prev.start ? slot + SLOT_MINUTES : prev.start + SLOT_MINUTES
+      return { start: prev.start, end: clampEnd(prev.start, candidateEnd) }
+    })
+  }
+
+  const handlePointerUp = () => {
+    if (dragging) setDragging(false)
+  }
+
+  const toggleMember = (memberId: number) => {
+    if (memberId === myMemberId) return
+    setSelectedIds((prev) =>
+      prev.includes(memberId) ? prev.filter((id) => id !== memberId) : [...prev, memberId],
+    )
+  }
+
+  const cancelDraft = () => {
+    setDraftRange(null)
+    setSubmitError(null)
+  }
+
+  const confirmDraft = async () => {
+    if (!draftRange || !roomId) return
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      await createBooking({
+        roomId: Number(roomId),
+        startTime: `${dateKey}T${minutesToHHMM(draftRange.start + START_HOUR * 60)}:00`,
+        endTime: `${dateKey}T${minutesToHHMM(draftRange.end + START_HOUR * 60)}:00`,
+        memberIds: selectedIds,
+      })
+      setDraftRange(null)
+      await fetchEntries()
+    } catch (err) {
+      setSubmitError(err instanceof BookingError ? err.message : '예약에 실패했습니다. 잠시 후 다시 시도해주세요.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const nowInRange = isToday && nowMinutes >= START_HOUR * 60 && nowMinutes <= END_HOUR * 60
-  const nowTop = nowInRange ? (offsetFromStart(nowMinutes) / 60) * HOUR_HEIGHT : null
+  const nowTop = nowInRange ? offsetToTop(offsetFromStart(nowMinutes)) : null
 
   const currentEntry = nowInRange
     ? entries.find((e) => {
@@ -109,11 +253,9 @@ export default function RoomTimetablePage() {
       })
     : undefined
 
-  const currentCaption = !nowInRange
-    ? null
-    : currentEntry
-      ? `지금 ${entryLabel(currentEntry)} 중`
-      : '지금 비어있음'
+  const currentCaption = !nowInRange ? null : currentEntry ? `지금 ${entryLabel(currentEntry)} 중` : '지금 비어있음'
+
+  const canConfirm = !!draftRange && selectedIds.length >= MIN_PARTICIPANTS && !submitting
 
   return (
     <div className="timetable-page">
@@ -137,14 +279,11 @@ export default function RoomTimetablePage() {
 
         {currentCaption && <p className="current-caption">{currentCaption}</p>}
 
-        {isToday && user?.role === 'STUDENT' && (
-          <button
-            type="button"
-            className="new-booking-cta"
-            onClick={() => navigate(`/rooms/${roomId}/book`)}
-          >
-            + 새 예약
-          </button>
+        {user?.role === 'STUDENT' && isToday && isBeforeOpen && (
+          <p className="state-message is-error">오늘 예약은 08:30부터 신청할 수 있습니다.</p>
+        )}
+        {user?.role === 'STUDENT' && canBook && (
+          <p className="drag-hint">빈 시간대를 눌러서 아래로 드래그하면 예약 시간을 정할 수 있어요.</p>
         )}
 
         {loading && <p className="state-message">불러오는 중...</p>}
@@ -160,12 +299,16 @@ export default function RoomTimetablePage() {
                 </div>
               ))}
 
+              {MINOR_TICKS.map((m) => (
+                <div key={m} className="minor-line" style={{ top: offsetToTop(m) }} />
+              ))}
+
               <div className="timeline-blocks">
                 {entries.map((entry, i) => {
                   const startOffset = offsetFromStart(minutesOfDay(entry.startTime))
                   const endOffset = offsetFromStart(minutesOfDay(entry.endTime))
-                  const top = (startOffset / 60) * HOUR_HEIGHT
-                  const height = Math.max(((endOffset - startOffset) / 60) * HOUR_HEIGHT, 20)
+                  const top = offsetToTop(startOffset)
+                  const height = Math.max(offsetToTop(endOffset) - offsetToTop(startOffset), 20)
                   const isPast = new Date(entry.endTime).getTime() <= now.getTime()
 
                   return (
@@ -184,7 +327,27 @@ export default function RoomTimetablePage() {
                     </motion.div>
                   )
                 })}
+
+                {draftRange && (
+                  <div
+                    className="timeline-block draft-block"
+                    style={{ top: offsetToTop(draftRange.start), height: offsetToTop(draftRange.end) - offsetToTop(draftRange.start) }}
+                  >
+                    <span className="block-time">
+                      {minutesToHHMM(draftRange.start + START_HOUR * 60)}–
+                      {minutesToHHMM(draftRange.end + START_HOUR * 60)}
+                    </span>
+                    <span className="block-label">새 예약</span>
+                  </div>
+                )}
               </div>
+
+              {hoverSlot !== null && !dragging && !draftRange && (
+                <div
+                  className="hover-slot"
+                  style={{ top: offsetToTop(hoverSlot), height: offsetToTop(hoverSlot + SLOT_MINUTES) - offsetToTop(hoverSlot) }}
+                />
+              )}
 
               {nowTop !== null && (
                 <div className="now-line" style={{ top: nowTop }}>
@@ -194,12 +357,71 @@ export default function RoomTimetablePage() {
                   </span>
                 </div>
               )}
+
+              {canBook && (
+                <div
+                  ref={trackRef}
+                  className="drag-track"
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  onPointerLeave={() => setHoverSlot(null)}
+                />
+              )}
             </div>
 
             {entries.length === 0 && <p className="empty-state">이 날짜엔 예약된 일정이 없습니다.</p>}
           </>
         )}
       </main>
+
+      <AnimatePresence>
+        {draftRange && (
+          <motion.div
+            className="confirm-panel"
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+          >
+            <div className="confirm-panel-inner">
+              <p className="confirm-range">
+                {minutesToHHMM(draftRange.start + START_HOUR * 60)} ~ {minutesToHHMM(draftRange.end + START_HOUR * 60)}{' '}
+                <span className="confirm-duration">({draftRange.end - draftRange.start}분)</span>
+              </p>
+
+              <p className="confirm-label">참여 인원 (최소 {MIN_PARTICIPANTS}명, 본인 포함)</p>
+              <div className="member-grid">
+                {roster.map((m) => {
+                  const isMe = m.memberId === myMemberId
+                  const checked = selectedIds.includes(m.memberId)
+                  return (
+                    <label
+                      key={m.memberId}
+                      className={`member-chip ${checked ? 'is-selected' : ''} ${isMe ? 'is-self' : ''}`}
+                    >
+                      <input type="checkbox" checked={checked} disabled={isMe} onChange={() => toggleMember(m.memberId)} />
+                      {m.name}
+                      {isMe && <span className="self-badge">본인</span>}
+                    </label>
+                  )
+                })}
+              </div>
+
+              {submitError && <p className="form-error">{submitError}</p>}
+
+              <div className="confirm-actions">
+                <button type="button" className="cancel-button" onClick={cancelDraft} disabled={submitting}>
+                  취소
+                </button>
+                <button type="button" className="confirm-button" onClick={confirmDraft} disabled={!canConfirm}>
+                  {submitting ? '예약 중...' : '확인'}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
