@@ -249,6 +249,10 @@ export default function MyBookingsPage() {
                 })}
               </div>
             )}
+
+            <button type="button" className="history-link" onClick={() => navigate('/bookings/history')}>
+              지난 예약 이력 보기 →
+            </button>
           </>
         )}
       </main>
