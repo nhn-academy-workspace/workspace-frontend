@@ -5,9 +5,7 @@ export interface TeamMember {
 
 export interface MyTeamRoster {
   memberId: number
-  // TODO(backend): teamId가 아직 응답에 없음. TeamMemberResponse에 teamId 필드
-  // 하나만 추가되면 팀 예약 이력(GET /teams/{teamId}/bookings) 조회에 바로 씀.
-  teamId?: number
+  teamId: number
   members: TeamMember[]
 }
 

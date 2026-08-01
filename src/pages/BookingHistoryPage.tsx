@@ -58,10 +58,6 @@ export default function BookingHistoryPage() {
     getMyTeamRoster()
       .then((roster) => {
         if (cancelled) return
-        if (!roster.teamId) {
-          setError('팀 정보를 불러오지 못했습니다.')
-          return
-        }
         return getTeamBookingHistory(roster.teamId).then((data) => {
           if (!cancelled) setEntries(data)
         })
