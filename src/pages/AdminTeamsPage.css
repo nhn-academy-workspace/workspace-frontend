@@ -1,0 +1,144 @@
+.admin-teams-page {
+  min-height: 100svh;
+  background: var(--paper);
+}
+
+.admin-teams-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 32px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.admin-teams-header .back-button {
+  border: none;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.admin-teams-header .back-button:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.admin-teams-header h1 {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--ink);
+}
+
+.admin-teams-content {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 32px 32px 64px;
+}
+
+.state-message {
+  color: var(--ink-soft);
+  font-size: 14px;
+  text-align: center;
+  margin-top: 40px;
+}
+
+.state-message.is-error {
+  color: var(--busy);
+}
+
+.admin-teams-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-team-card {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 18px 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-team-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.admin-team-top h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+
+.admin-team-count {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.admin-team-empty {
+  font-size: 13px;
+  color: var(--ink-faint);
+  margin: 0;
+}
+
+.admin-member-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-member-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+}
+
+.admin-member-list li:first-child {
+  border-top: none;
+}
+
+.admin-member-name {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.admin-member-login {
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .admin-teams-header {
+    padding: 14px 20px;
+  }
+
+  .admin-teams-content {
+    padding: 24px 20px 48px;
+  }
+}
