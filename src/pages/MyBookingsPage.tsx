@@ -4,6 +4,8 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { getRooms, getRoomBookings } from '../api/rooms'
 import { getMyTeamBookingsToday, describeBookingTiming, formatMinutes, type MyBookingEntry } from '../api/myBooking'
 import { extendBooking, earlyReturnBooking, BookingError } from '../api/bookings'
+import { getMyTeamRoster } from '../api/teams'
+import { getTeamUsage, type TeamUsage } from '../api/teamUsage'
 import { useAuth } from '../context/AuthContext'
 import './MyBookingsPage.css'
 
@@ -45,6 +47,7 @@ export default function MyBookingsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(() => new Date())
+  const [usage, setUsage] = useState<TeamUsage | null>(null)
 
   const [actionSubmitting, setActionSubmitting] = useState<number | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -64,8 +67,17 @@ export default function MyBookingsPage() {
       .finally(() => setLoading(false))
   }
 
+  const fetchUsage = () => {
+    if (!user?.teamName) return
+    getMyTeamRoster()
+      .then((roster) => (roster.teamId ? getTeamUsage(roster.teamId, toDateKey(new Date())) : null))
+      .then((data) => setUsage(data))
+      .catch(() => setUsage(null))
+  }
+
   useEffect(() => {
     fetchBookings()
+    fetchUsage()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.teamName])
 
@@ -123,6 +135,7 @@ export default function MyBookingsPage() {
       await extendBooking(entry.id, addMinutesIso(entry.endTime, minutes))
       closeExtend()
       await fetchBookings()
+      fetchUsage()
     } catch (err) {
       setActionError(err instanceof BookingError ? err.message : '연장에 실패했습니다. 잠시 후 다시 시도해주세요.')
     } finally {
@@ -137,6 +150,7 @@ export default function MyBookingsPage() {
       await earlyReturnBooking(entry.id)
       closeExtend()
       await fetchBookings()
+      fetchUsage()
     } catch (err) {
       setActionError(err instanceof BookingError ? err.message : '조기 반납에 실패했습니다. 잠시 후 다시 시도해주세요.')
     } finally {
@@ -158,6 +172,24 @@ export default function MyBookingsPage() {
           <p className="state-message">TA 계정은 팀 예약이 없습니다.</p>
         ) : (
           <>
+            {usage && (
+              <div className="usage-summary">
+                <div className="usage-summary-top">
+                  <span>오늘 사용 시간</span>
+                  <span>{formatMinutes(usage.usedMinutes)} / {formatMinutes(DAILY_CAP_MINUTES)}</span>
+                </div>
+                <div className="usage-bar">
+                  <div
+                    className="usage-bar-fill"
+                    style={{ width: `${Math.min((usage.usedMinutes / DAILY_CAP_MINUTES) * 100, 100)}%` }}
+                  />
+                </div>
+                <p className="usage-summary-remaining">
+                  남은 {formatMinutes(Math.max(usage.remainingMinutes, 0))}
+                </p>
+              </div>
+            )}
+
             {loading && <p className="state-message">불러오는 중...</p>}
             {error && <p className="state-message is-error">{error}</p>}
 
