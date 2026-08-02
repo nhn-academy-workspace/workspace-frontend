@@ -98,6 +98,9 @@ export default function MainPage() {
               {user.name}님
             </span>
           )}
+          <button type="button" className="logout-button" onClick={() => navigate('/change-password')}>
+            비밀번호 변경
+          </button>
           <button type="button" className="logout-button" onClick={handleLogout}>
             로그아웃
           </button>

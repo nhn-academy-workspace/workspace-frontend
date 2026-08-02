@@ -71,7 +71,7 @@ export default function LoginPage() {
     try {
       const user = await login(loginId, password)
       setUser(user)
-      navigate('/main', { replace: true })
+      navigate(user.mustChangePassword ? '/change-password' : '/main', { replace: true })
     } catch (err) {
       setError(err instanceof LoginError ? err.message : '알 수 없는 오류가 발생했습니다.')
     } finally {
