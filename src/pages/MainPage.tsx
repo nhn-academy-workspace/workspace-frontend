@@ -98,6 +98,9 @@ export default function MainPage() {
               {user.name}님
             </span>
           )}
+          <button type="button" className="logout-button" onClick={() => navigate('/change-password')}>
+            비밀번호 변경
+          </button>
           <button type="button" className="logout-button" onClick={handleLogout}>
             로그아웃
           </button>
@@ -155,6 +158,26 @@ export default function MainPage() {
               </>
             )}
             <span className="banner-link">내 예약 보기 →</span>
+          </motion.article>
+        )}
+
+        {user?.role === 'TA' && (
+          <motion.article
+            className="my-booking-banner admin-banner"
+            initial={{ opacity: 0, y: reduceMotion ? 0 : 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.45, ease: 'easeOut' }}
+            onClick={() => navigate('/admin/teams')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') navigate('/admin/teams')
+            }}
+          >
+            <span className="banner-eyebrow">TA 관리</span>
+            <h2>전체 팀 · 소속 학생 보기</h2>
+            <p>팀 구성과 학생 명단을 한눈에 확인하세요.</p>
+            <span className="banner-link">팀 관리 화면으로 →</span>
           </motion.article>
         )}
 

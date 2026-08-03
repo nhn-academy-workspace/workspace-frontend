@@ -128,6 +128,10 @@
   margin: 0;
 }
 
+.admin-banner {
+  background: linear-gradient(135deg, var(--ink-soft) 0%, var(--ink) 100%);
+}
+
 .banner-link {
   display: inline-block;
   margin-top: 16px;

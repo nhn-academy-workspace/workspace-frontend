@@ -4,6 +4,8 @@ import MainPage from './pages/MainPage'
 import RoomTimetablePage from './pages/RoomTimetablePage'
 import MyBookingsPage from './pages/MyBookingsPage'
 import BookingHistoryPage from './pages/BookingHistoryPage'
+import AdminTeamsPage from './pages/AdminTeamsPage'
+import ChangePasswordPage from './pages/ChangePasswordPage'
 import { RequireAuth } from './components/RequireAuth'
 
 function App() {
@@ -39,6 +41,22 @@ function App() {
         element={
           <RequireAuth>
             <BookingHistoryPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/teams"
+        element={
+          <RequireAuth>
+            <AdminTeamsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/change-password"
+        element={
+          <RequireAuth>
+            <ChangePasswordPage />
           </RequireAuth>
         }
       />

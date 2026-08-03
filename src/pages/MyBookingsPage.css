@@ -55,6 +55,43 @@
   color: var(--busy);
 }
 
+.usage-summary {
+  margin-bottom: 22px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.usage-summary-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.usage-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.usage-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+
+.usage-summary-remaining {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+
 .my-bookings-list {
   display: flex;
   flex-direction: column;
