@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { getRoomBookings, getRooms, type Room, type TimetableEntry } from '../api/rooms'
 import { getMyTeamRoster, type TeamMember } from '../api/teams'
 import { createBooking, BookingError } from '../api/bookings'
-import { adjustBooking, cancelBooking, AdminActionError } from '../api/adminBookings'
+import { adjustBooking, cancelBooking, createLock, deleteLock, AdminActionError } from '../api/adminBookings'
 import { useAuth } from '../context/AuthContext'
 import './RoomTimetablePage.css'
 
@@ -99,12 +99,16 @@ export default function RoomTimetablePage() {
   const [adjustingId, setAdjustingId] = useState<number | null>(null)
   const [adjustStart, setAdjustStart] = useState('')
   const [adjustEnd, setAdjustEnd] = useState('')
+  const [lockReason, setLockReason] = useState('')
+  const [deletingLockId, setDeletingLockId] = useState<number | null>(null)
 
   const dateKey = useMemo(() => toDateKey(date), [date])
   const isToday = dateKey === toDateKey(now)
   const nowMinutes = now.getHours() * 60 + now.getMinutes()
   const isBeforeOpen = now.getHours() < OPEN_HOUR || (now.getHours() === OPEN_HOUR && now.getMinutes() < OPEN_MINUTE)
   const canBook = user?.role === 'STUDENT' && isToday && !isBeforeOpen
+  const canLock = user?.role === 'TA' && isToday
+  const canDrag = canBook || canLock
 
   const fetchEntries = () => {
     if (!roomId) return Promise.resolve()
@@ -173,7 +177,8 @@ export default function RoomTimetablePage() {
 
   // start에서 시작해서 최대한 늘릴 수 있는 끝 지점(다음 예약/락, 2시간 상한, 마감시간 중 가장 빠른 것)
   const clampEnd = (start: number, candidateEnd: number) => {
-    let maxEnd = Math.min(candidateEnd, start + MAX_DURATION, TOTAL_MINUTES)
+    const durationCap = canLock ? TOTAL_MINUTES : MAX_DURATION
+    let maxEnd = Math.min(candidateEnd, start + durationCap, TOTAL_MINUTES)
     for (const o of occupied) {
       if (o.start > start && o.start < maxEnd) maxEnd = o.start
     }
@@ -191,19 +196,20 @@ export default function RoomTimetablePage() {
   const isPastSlot = (start: number) => isToday && start + START_HOUR * 60 < nowMinutes
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    if (!canBook) return
+    if (!canDrag) return
     const slot = offsetFromPointer(e.clientY)
     if (isPastSlot(slot) || !isSlotFree(slot, slot + SLOT_MINUTES)) return
     ;(e.target as Element).setPointerCapture(e.pointerId)
     setDragging(true)
     setSubmitError(null)
+    setLockReason('')
     setDraftRange({ start: slot, end: slot + SLOT_MINUTES })
   }
 
   const handlePointerMove = (e: React.PointerEvent) => {
     const slot = offsetFromPointer(e.clientY)
     if (!dragging) {
-      setHoverSlot(canBook && !isPastSlot(slot) && isSlotFree(slot, slot + SLOT_MINUTES) ? slot : null)
+      setHoverSlot(canDrag && !isPastSlot(slot) && isSlotFree(slot, slot + SLOT_MINUTES) ? slot : null)
       return
     }
     setDraftRange((prev) => {
@@ -233,17 +239,19 @@ export default function RoomTimetablePage() {
     if (!draftRange || !roomId) return
     setSubmitting(true)
     setSubmitError(null)
+    const startTime = `${dateKey}T${minutesToHHMM(draftRange.start + START_HOUR * 60)}:00`
+    const endTime = `${dateKey}T${minutesToHHMM(draftRange.end + START_HOUR * 60)}:00`
     try {
-      await createBooking({
-        roomId: Number(roomId),
-        startTime: `${dateKey}T${minutesToHHMM(draftRange.start + START_HOUR * 60)}:00`,
-        endTime: `${dateKey}T${minutesToHHMM(draftRange.end + START_HOUR * 60)}:00`,
-        memberIds: selectedIds,
-      })
+      if (canLock) {
+        await createLock({ roomId: Number(roomId), startTime, endTime, reason: lockReason || undefined })
+      } else {
+        await createBooking({ roomId: Number(roomId), startTime, endTime, memberIds: selectedIds })
+      }
       setDraftRange(null)
       await fetchEntries()
     } catch (err) {
-      setSubmitError(err instanceof BookingError ? err.message : '예약에 실패했습니다. 잠시 후 다시 시도해주세요.')
+      const fallback = canLock ? '락 생성에 실패했습니다.' : '예약에 실패했습니다. 잠시 후 다시 시도해주세요.'
+      setSubmitError(err instanceof BookingError || err instanceof AdminActionError ? err.message : fallback)
     } finally {
       setSubmitting(false)
     }
@@ -284,6 +292,20 @@ export default function RoomTimetablePage() {
     }
   }
 
+  const handleDeleteLock = async (lockId: number) => {
+    if (!window.confirm('이 락을 취소할까요?')) return
+    setDeletingLockId(lockId)
+    setActionError(null)
+    try {
+      await deleteLock(lockId)
+      await fetchEntries()
+    } catch (err) {
+      setActionError(err instanceof AdminActionError ? err.message : '락 취소에 실패했습니다.')
+    } finally {
+      setDeletingLockId(null)
+    }
+  }
+
   const nowInRange = isToday && nowMinutes >= START_HOUR * 60 && nowMinutes <= END_HOUR * 60
   const nowTop = nowInRange ? offsetToTop(offsetFromStart(nowMinutes)) : null
 
@@ -297,7 +319,9 @@ export default function RoomTimetablePage() {
 
   const currentCaption = !nowInRange ? null : currentEntry ? `지금 ${entryLabel(currentEntry)} 중` : '지금 비어있음'
 
-  const canConfirm = !!draftRange && selectedIds.length >= MIN_PARTICIPANTS && !submitting
+  const canConfirm = canLock
+    ? !!draftRange && !submitting
+    : !!draftRange && selectedIds.length >= MIN_PARTICIPANTS && !submitting
 
   return (
     <div className="timetable-page">
@@ -327,6 +351,9 @@ export default function RoomTimetablePage() {
         )}
         {user?.role === 'STUDENT' && canBook && (
           <p className="drag-hint">빈 시간대를 눌러서 아래로 드래그하면 예약 시간을 정할 수 있어요.</p>
+        )}
+        {canLock && (
+          <p className="drag-hint">빈 시간대를 드래그하면 락을 걸 수 있어요. 락/취소 버튼은 각 블록에 있어요.</p>
         )}
 
         {loading && <p className="state-message">불러오는 중...</p>}
@@ -409,6 +436,18 @@ export default function RoomTimetablePage() {
                           )}
                         </div>
                       )}
+
+                      {user?.role === 'TA' && entry.type === 'LOCK' && (
+                        <div className="admin-block-actions" onPointerDown={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            disabled={deletingLockId === entry.id}
+                            onClick={() => handleDeleteLock(entry.id)}
+                          >
+                            락 취소
+                          </button>
+                        </div>
+                      )}
                     </motion.div>
                   )
                 })}
@@ -422,7 +461,7 @@ export default function RoomTimetablePage() {
                       {minutesToHHMM(draftRange.start + START_HOUR * 60)}–
                       {minutesToHHMM(draftRange.end + START_HOUR * 60)}
                     </span>
-                    <span className="block-label">새 예약</span>
+                    <span className="block-label">{canLock ? '새 락' : '새 예약'}</span>
                   </div>
                 )}
               </div>
@@ -443,7 +482,7 @@ export default function RoomTimetablePage() {
                 </div>
               )}
 
-              {canBook && (
+              {canDrag && (
                 <div
                   ref={trackRef}
                   className="drag-track"
@@ -475,23 +514,38 @@ export default function RoomTimetablePage() {
                 <span className="confirm-duration">({draftRange.end - draftRange.start}분)</span>
               </p>
 
-              <p className="confirm-label">참여 인원 (최소 {MIN_PARTICIPANTS}명, 본인 포함)</p>
-              <div className="member-grid">
-                {roster.map((m) => {
-                  const isMe = m.memberId === myMemberId
-                  const checked = selectedIds.includes(m.memberId)
-                  return (
-                    <label
-                      key={m.memberId}
-                      className={`member-chip ${checked ? 'is-selected' : ''} ${isMe ? 'is-self' : ''}`}
-                    >
-                      <input type="checkbox" checked={checked} disabled={isMe} onChange={() => toggleMember(m.memberId)} />
-                      {m.name}
-                      {isMe && <span className="self-badge">본인</span>}
-                    </label>
-                  )
-                })}
-              </div>
+              {canLock ? (
+                <>
+                  <p className="confirm-label">사유 (선택)</p>
+                  <input
+                    type="text"
+                    className="lock-reason-input"
+                    value={lockReason}
+                    onChange={(e) => setLockReason(e.target.value)}
+                    placeholder="예: 사무실 회의"
+                  />
+                </>
+              ) : (
+                <>
+                  <p className="confirm-label">참여 인원 (최소 {MIN_PARTICIPANTS}명, 본인 포함)</p>
+                  <div className="member-grid">
+                    {roster.map((m) => {
+                      const isMe = m.memberId === myMemberId
+                      const checked = selectedIds.includes(m.memberId)
+                      return (
+                        <label
+                          key={m.memberId}
+                          className={`member-chip ${checked ? 'is-selected' : ''} ${isMe ? 'is-self' : ''}`}
+                        >
+                          <input type="checkbox" checked={checked} disabled={isMe} onChange={() => toggleMember(m.memberId)} />
+                          {m.name}
+                          {isMe && <span className="self-badge">본인</span>}
+                        </label>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
 
               {submitError && <p className="form-error">{submitError}</p>}
 
@@ -500,7 +554,7 @@ export default function RoomTimetablePage() {
                   취소
                 </button>
                 <button type="button" className="confirm-button" onClick={confirmDraft} disabled={!canConfirm}>
-                  {submitting ? '예약 중...' : '확인'}
+                  {submitting ? '처리 중...' : canLock ? '락 걸기' : '확인'}
                 </button>
               </div>
             </div>

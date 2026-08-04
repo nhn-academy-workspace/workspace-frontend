@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { getAdminTeams, changeMemberTeam, type AdminTeam } from '../api/admin'
+import { getAdminTeams, changeMemberTeam, callTarget, type AdminTeam } from '../api/admin'
 import { useAuth } from '../context/AuthContext'
 import './AdminTeamsPage.css'
 
@@ -17,6 +17,9 @@ export default function AdminTeamsPage() {
   const [reassignTarget, setReassignTarget] = useState<Record<number, number>>({})
   const [reassigning, setReassigning] = useState<number | null>(null)
   const [reassignError, setReassignError] = useState<string | null>(null)
+
+  const [calling, setCalling] = useState<string | null>(null)
+  const [callError, setCallError] = useState<string | null>(null)
 
   const fetchTeams = () => {
     setLoading(true)
@@ -49,6 +52,22 @@ export default function AdminTeamsPage() {
     }
   }
 
+  const handleCall = async (targetType: 'MEMBER' | 'TEAM', targetId: number, label: string) => {
+    const message = window.prompt(`${label}에게 보낼 메시지를 입력하세요`, '회의실로 와주세요')
+    if (!message) return
+    const callKey = `${targetType}-${targetId}`
+    setCalling(callKey)
+    setCallError(null)
+    try {
+      await callTarget(targetType, targetId, message)
+      window.alert('호출을 보냈습니다.')
+    } catch (err) {
+      setCallError(err instanceof Error ? err.message : '호출에 실패했습니다.')
+    } finally {
+      setCalling(null)
+    }
+  }
+
   return (
     <div className="admin-teams-page">
       <header className="admin-teams-header">
@@ -71,6 +90,7 @@ export default function AdminTeamsPage() {
             )}
 
             {reassignError && <p className="state-message is-error">{reassignError}</p>}
+            {callError && <p className="state-message is-error">{callError}</p>}
 
             {!loading && !error && teams.length > 0 && (
               <div className="admin-teams-list">
@@ -85,6 +105,14 @@ export default function AdminTeamsPage() {
                     <div className="admin-team-top">
                       <h2>{team.name}</h2>
                       <span className="admin-team-count">{team.members.length}명</span>
+                      <button
+                        type="button"
+                        className="admin-call-button"
+                        disabled={calling === `TEAM-${team.teamId}`}
+                        onClick={() => handleCall('TEAM', team.teamId, team.name)}
+                      >
+                        팀 호출
+                      </button>
                     </div>
 
                     {team.members.length === 0 ? (
@@ -118,6 +146,14 @@ export default function AdminTeamsPage() {
                                 onClick={() => handleReassign(m.memberId, target)}
                               >
                                 {reassigning === m.memberId ? '이동 중...' : '이동'}
+                              </button>
+                              <button
+                                type="button"
+                                className="admin-call-button"
+                                disabled={calling === `MEMBER-${m.memberId}`}
+                                onClick={() => handleCall('MEMBER', m.memberId, m.name)}
+                              >
+                                호출
                               </button>
                             </li>
                           )

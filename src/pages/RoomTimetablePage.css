@@ -344,6 +344,16 @@
   color: var(--ink-soft);
 }
 
+.lock-reason-input {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
 .member-grid {
   display: flex;
   flex-wrap: wrap;
