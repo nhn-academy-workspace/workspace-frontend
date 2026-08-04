@@ -20,3 +20,33 @@ export async function getAdminTeams(): Promise<AdminTeam[]> {
   }
   return res.json()
 }
+
+export async function changeMemberTeam(memberId: number, teamId: number): Promise<void> {
+  const res = await fetch(`${API_V1}/admin/members/${memberId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ teamId }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.message ?? '팀 재배정에 실패했습니다.')
+  }
+}
+
+export async function callTarget(
+  targetType: 'MEMBER' | 'TEAM',
+  targetId: number,
+  message: string,
+): Promise<void> {
+  const res = await fetch(`${API_V1}/admin/calls`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ targetType, targetId, message }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.message ?? '호출에 실패했습니다.')
+  }
+}

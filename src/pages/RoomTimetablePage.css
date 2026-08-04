@@ -236,6 +236,38 @@
   text-overflow: ellipsis;
 }
 
+.admin-block-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.admin-block-actions button {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.admin-block-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.admin-block-actions input[type='time'] {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 11px;
+  padding: 2px 4px;
+  width: 68px;
+}
+
 .now-line {
   position: absolute;
   left: 56px;
@@ -310,6 +342,16 @@
   font-size: 13px;
   font-weight: 700;
   color: var(--ink-soft);
+}
+
+.lock-reason-input {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--ink);
 }
 
 .member-grid {
