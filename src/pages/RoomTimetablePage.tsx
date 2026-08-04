@@ -4,6 +4,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { getRoomBookings, getRooms, type Room, type TimetableEntry } from '../api/rooms'
 import { getMyTeamRoster, type TeamMember } from '../api/teams'
 import { createBooking, BookingError } from '../api/bookings'
+import { adjustBooking, cancelBooking, AdminActionError } from '../api/adminBookings'
 import { useAuth } from '../context/AuthContext'
 import './RoomTimetablePage.css'
 
@@ -92,6 +93,12 @@ export default function RoomTimetablePage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const [actionSubmitting, setActionSubmitting] = useState<number | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [adjustingId, setAdjustingId] = useState<number | null>(null)
+  const [adjustStart, setAdjustStart] = useState('')
+  const [adjustEnd, setAdjustEnd] = useState('')
 
   const dateKey = useMemo(() => toDateKey(date), [date])
   const isToday = dateKey === toDateKey(now)
@@ -242,6 +249,41 @@ export default function RoomTimetablePage() {
     }
   }
 
+  const handleCancelBooking = async (bookingId: number) => {
+    if (!window.confirm('이 예약을 취소할까요?')) return
+    setActionSubmitting(bookingId)
+    setActionError(null)
+    try {
+      await cancelBooking(bookingId)
+      await fetchEntries()
+    } catch (err) {
+      setActionError(err instanceof AdminActionError ? err.message : '예약 취소에 실패했습니다.')
+    } finally {
+      setActionSubmitting(null)
+    }
+  }
+
+  const openAdjust = (entry: TimetableEntry) => {
+    setAdjustingId(entry.id)
+    setAdjustStart(formatTime(entry.startTime))
+    setAdjustEnd(formatTime(entry.endTime))
+    setActionError(null)
+  }
+
+  const submitAdjust = async (bookingId: number) => {
+    setActionSubmitting(bookingId)
+    setActionError(null)
+    try {
+      await adjustBooking(bookingId, `${dateKey}T${adjustStart}:00`, `${dateKey}T${adjustEnd}:00`)
+      setAdjustingId(null)
+      await fetchEntries()
+    } catch (err) {
+      setActionError(err instanceof AdminActionError ? err.message : '예약 조정에 실패했습니다.')
+    } finally {
+      setActionSubmitting(null)
+    }
+  }
+
   const nowInRange = isToday && nowMinutes >= START_HOUR * 60 && nowMinutes <= END_HOUR * 60
   const nowTop = nowInRange ? offsetToTop(offsetFromStart(nowMinutes)) : null
 
@@ -278,6 +320,7 @@ export default function RoomTimetablePage() {
         </div>
 
         {currentCaption && <p className="current-caption">{currentCaption}</p>}
+        {actionError && <p className="state-message is-error">{actionError}</p>}
 
         {user?.role === 'STUDENT' && isToday && isBeforeOpen && (
           <p className="state-message is-error">오늘 예약은 08:30부터 신청할 수 있습니다.</p>
@@ -324,6 +367,48 @@ export default function RoomTimetablePage() {
                         {formatTime(entry.startTime)}–{formatTime(entry.endTime)}
                       </span>
                       <span className="block-label">{entryLabel(entry)}</span>
+
+                      {user?.role === 'TA' && entry.type === 'BOOKING' && (
+                        <div className="admin-block-actions" onPointerDown={(e) => e.stopPropagation()}>
+                          {adjustingId === entry.id ? (
+                            <>
+                              <input
+                                type="time"
+                                value={adjustStart}
+                                onChange={(e) => setAdjustStart(e.target.value)}
+                              />
+                              <input type="time" value={adjustEnd} onChange={(e) => setAdjustEnd(e.target.value)} />
+                              <button
+                                type="button"
+                                disabled={actionSubmitting === entry.id}
+                                onClick={() => submitAdjust(entry.id)}
+                              >
+                                저장
+                              </button>
+                              <button type="button" onClick={() => setAdjustingId(null)}>
+                                취소
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                disabled={actionSubmitting === entry.id}
+                                onClick={() => openAdjust(entry)}
+                              >
+                                조정
+                              </button>
+                              <button
+                                type="button"
+                                disabled={actionSubmitting === entry.id}
+                                onClick={() => handleCancelBooking(entry.id)}
+                              >
+                                취소
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </motion.div>
                   )
                 })}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { getAdminTeams, type AdminTeam } from '../api/admin'
+import { getAdminTeams, changeMemberTeam, type AdminTeam } from '../api/admin'
 import { useAuth } from '../context/AuthContext'
 import './AdminTeamsPage.css'
 
@@ -14,30 +14,40 @@ export default function AdminTeamsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [reassignTarget, setReassignTarget] = useState<Record<number, number>>({})
+  const [reassigning, setReassigning] = useState<number | null>(null)
+  const [reassignError, setReassignError] = useState<string | null>(null)
+
+  const fetchTeams = () => {
+    setLoading(true)
+    setError(null)
+    return getAdminTeams()
+      .then((data) => setTeams(data))
+      .catch(() => setError('팀 목록을 불러오지 못했습니다.'))
+      .finally(() => setLoading(false))
+  }
+
   useEffect(() => {
     if (user?.role !== 'TA') {
       setLoading(false)
       return
     }
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-
-    getAdminTeams()
-      .then((data) => {
-        if (!cancelled) setTeams(data)
-      })
-      .catch(() => {
-        if (!cancelled) setError('팀 목록을 불러오지 못했습니다.')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
+    fetchTeams()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.role])
+
+  const handleReassign = async (memberId: number, teamId: number) => {
+    setReassigning(memberId)
+    setReassignError(null)
+    try {
+      await changeMemberTeam(memberId, teamId)
+      await fetchTeams()
+    } catch (err) {
+      setReassignError(err instanceof Error ? err.message : '팀 재배정에 실패했습니다.')
+    } finally {
+      setReassigning(null)
+    }
+  }
 
   return (
     <div className="admin-teams-page">
@@ -60,6 +70,8 @@ export default function AdminTeamsPage() {
               <p className="state-message">등록된 팀이 없어요.</p>
             )}
 
+            {reassignError && <p className="state-message is-error">{reassignError}</p>}
+
             {!loading && !error && teams.length > 0 && (
               <div className="admin-teams-list">
                 {teams.map((team, i) => (
@@ -79,12 +91,37 @@ export default function AdminTeamsPage() {
                       <p className="admin-team-empty">소속 학생이 없어요.</p>
                     ) : (
                       <ul className="admin-member-list">
-                        {team.members.map((m) => (
-                          <li key={m.memberId}>
-                            <span className="admin-member-name">{m.name}</span>
-                            <span className="admin-member-login">{m.loginId}</span>
-                          </li>
-                        ))}
+                        {team.members.map((m) => {
+                          const target = reassignTarget[m.memberId] ?? team.teamId
+                          return (
+                            <li key={m.memberId}>
+                              <span className="admin-member-name">{m.name}</span>
+                              <span className="admin-member-login">{m.loginId}</span>
+                              <select
+                                className="admin-reassign-select"
+                                value={target}
+                                onChange={(e) =>
+                                  setReassignTarget((prev) => ({ ...prev, [m.memberId]: Number(e.target.value) }))
+                                }
+                                disabled={reassigning === m.memberId}
+                              >
+                                {teams.map((t) => (
+                                  <option key={t.teamId} value={t.teamId}>
+                                    {t.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                className="admin-reassign-button"
+                                disabled={target === team.teamId || reassigning === m.memberId}
+                                onClick={() => handleReassign(m.memberId, target)}
+                              >
+                                {reassigning === m.memberId ? '이동 중...' : '이동'}
+                              </button>
+                            </li>
+                          )
+                        })}
                       </ul>
                     )}
                   </motion.section>
