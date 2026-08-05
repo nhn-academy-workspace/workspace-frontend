@@ -216,6 +216,18 @@ export default function RoomTimetablePage() {
 
   const isPastSlot = (start: number) => isToday && start + START_HOUR * 60 < nowMinutes
 
+  // 드래그 중 손가락이 화면 위/아래 가장자리에 가까워지면 자동으로 스크롤해준다.
+  const AUTO_SCROLL_EDGE = 72
+  const AUTO_SCROLL_SPEED = 18
+
+  const maybeAutoScroll = (clientY: number) => {
+    if (clientY < AUTO_SCROLL_EDGE) {
+      window.scrollBy({ top: -AUTO_SCROLL_SPEED })
+    } else if (clientY > window.innerHeight - AUTO_SCROLL_EDGE) {
+      window.scrollBy({ top: AUTO_SCROLL_SPEED })
+    }
+  }
+
   // 조정 중인 예약 자신은 충돌 대상에서 제외한 다른 예약/락 목록
   const adjustOccupied = useMemo(
     () =>
@@ -230,6 +242,7 @@ export default function RoomTimetablePage() {
 
   const handleResizePointerDown = (e: React.PointerEvent, edge: 'start' | 'end') => {
     e.stopPropagation()
+    e.preventDefault()
     ;(e.target as Element).setPointerCapture(e.pointerId)
     setResizingEdge(edge)
   }
@@ -237,6 +250,7 @@ export default function RoomTimetablePage() {
   const handleResizePointerMove = (e: React.PointerEvent) => {
     if (!resizingEdge) return
     e.stopPropagation()
+    maybeAutoScroll(e.clientY)
     const slot = offsetFromPointer(e.clientY)
     setAdjustRange((prev) => {
       if (!prev) return prev
@@ -264,6 +278,9 @@ export default function RoomTimetablePage() {
     if (!canDrag) return
     const slot = offsetFromPointer(e.clientY)
     if (isPastSlot(slot) || !isSlotFree(slot, slot + SLOT_MINUTES)) return
+    // 실제로 드래그를 시작할 때만 기본 동작(터치 스크롤 등)을 막는다.
+    // 겹치는/지난 슬롯 위에서는 여기까지 오지 않으므로 터치 스크롤이 정상 동작한다.
+    e.preventDefault()
     ;(e.target as Element).setPointerCapture(e.pointerId)
     setDragging(true)
     setSubmitError(null)
@@ -277,6 +294,7 @@ export default function RoomTimetablePage() {
       setHoverSlot(canDrag && !isPastSlot(slot) && isSlotFree(slot, slot + SLOT_MINUTES) ? slot : null)
       return
     }
+    maybeAutoScroll(e.clientY)
     setDraftRange((prev) => {
       if (!prev) return prev
       const candidateEnd = slot >= prev.start ? slot + SLOT_MINUTES : prev.start + SLOT_MINUTES
