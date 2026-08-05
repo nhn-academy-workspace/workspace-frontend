@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { getRoomBookings } from '../api/rooms'
 import { getTeamBookingHistory, type TeamBookingHistoryEntry } from '../api/teamHistory'
 import { describeBookingTiming, formatMinutes } from '../api/myBooking'
-import { extendBooking, earlyReturnBooking, BookingError } from '../api/bookings'
+import { extendBooking, earlyReturnBooking, cancelBooking, BookingError } from '../api/bookings'
 import { getMyTeamRoster } from '../api/teams'
 import { getTeamUsage, type TeamUsage } from '../api/teamUsage'
 import { useAuth } from '../context/AuthContext'
@@ -168,6 +168,22 @@ export default function MyBookingsPage() {
     }
   }
 
+  const handleCancel = async (entry: TeamBookingHistoryEntry) => {
+    if (!window.confirm('이 예약을 취소할까요?')) return
+    setActionSubmitting(entry.bookingId)
+    setActionError(null)
+    try {
+      await cancelBooking(entry.bookingId)
+      closeExtend()
+      await fetchBookings()
+      fetchUsage()
+    } catch (err) {
+      setActionError(err instanceof BookingError ? err.message : '예약 취소에 실패했습니다. 잠시 후 다시 시도해주세요.')
+    } finally {
+      setActionSubmitting(null)
+    }
+  }
+
   const sortedBookings = [...bookings].sort((a, b) => {
     const rankDiff = sortRank(a, now) - sortRank(b, now)
     if (rankDiff !== 0) return rankDiff
@@ -223,6 +239,7 @@ export default function MyBookingsPage() {
                   const canOfferExtend =
                     !isCancelled && timing.phase === 'ongoing' && timing.minutes <= EXTEND_WINDOW && entry.status === 'BOOKED'
                   const canOfferEarlyReturn = !isCancelled && timing.phase === 'ongoing' && entry.status === 'BOOKED'
+                  const canOfferCancel = !isCancelled && timing.phase === 'upcoming' && entry.status === 'BOOKED'
                   const submitting = actionSubmitting === entry.bookingId
                   const isExtending = extendingId === entry.bookingId
 
@@ -248,7 +265,7 @@ export default function MyBookingsPage() {
                         {!isCancelled && timing.phase === 'past' && '종료됨'}
                       </p>
 
-                      {(canOfferExtend || canOfferEarlyReturn) && (
+                      {(canOfferExtend || canOfferEarlyReturn || canOfferCancel) && (
                         <div className="booking-actions">
                           {canOfferExtend && (
                             <button type="button" onClick={() => openExtend(entry)} disabled={submitting}>
@@ -263,6 +280,16 @@ export default function MyBookingsPage() {
                               disabled={submitting}
                             >
                               조기 반납
+                            </button>
+                          )}
+                          {canOfferCancel && (
+                            <button
+                              type="button"
+                              className="cancel-button"
+                              onClick={() => handleCancel(entry)}
+                              disabled={submitting}
+                            >
+                              예약 취소
                             </button>
                           )}
                         </div>

@@ -200,6 +200,14 @@
   background: var(--busy-soft);
 }
 
+.booking-actions .cancel-button {
+  color: var(--busy);
+}
+
+.booking-actions .cancel-button:hover:not(:disabled) {
+  background: var(--busy-soft);
+}
+
 .extend-options {
   display: flex;
   flex-wrap: wrap;
