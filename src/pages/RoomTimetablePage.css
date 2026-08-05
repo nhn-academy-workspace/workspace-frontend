@@ -190,6 +190,10 @@
   justify-content: center;
   gap: 1px;
   overflow: hidden;
+  z-index: 9;
+  /* drag-track(z-index 8)가 항상 위에 떠서 블록 클릭을 가로채던 문제 때문에
+     블록 자체는 클릭을 통과시키고, 실제 조작이 필요한 admin-block-actions만 다시 받는다. */
+  pointer-events: none;
 }
 
 .entry-booking {
@@ -212,7 +216,7 @@
   background: var(--accent-soft);
   border: 2px dashed var(--accent);
   border-left-width: 2px;
-  z-index: 7;
+  z-index: 10;
 }
 
 .draft-block .block-label,
@@ -242,6 +246,7 @@
   gap: 4px;
   margin-top: 4px;
   flex-wrap: wrap;
+  pointer-events: auto;
 }
 
 .admin-block-actions button {

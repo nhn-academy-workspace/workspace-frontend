@@ -163,13 +163,15 @@ export default function RoomTimetablePage() {
   }
 
   // 기존 예약/락을 offset-분 구간으로 변환
+  // TA가 락을 걸 때는 예약을 무시하고 드래그할 수 있어야 하므로(겹치는 예약은 백엔드에서 자동 조정),
+  // 락 걸기 모드에서는 다른 락만 충돌 대상으로 취급한다.
   const occupied = useMemo(
     () =>
-      entries.map((e) => ({
+      (canLock ? entries.filter((e) => e.type === 'LOCK') : entries).map((e) => ({
         start: offsetFromStart(minutesOfDay(e.startTime)),
         end: offsetFromStart(minutesOfDay(e.endTime)),
       })),
-    [entries],
+    [entries, canLock],
   )
 
   const isSlotFree = (start: number, end: number) =>

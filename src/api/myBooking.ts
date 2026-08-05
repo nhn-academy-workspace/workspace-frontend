@@ -29,7 +29,7 @@ export interface BookingTiming {
   minutes: number // upcoming: 시작까지 남은 분 / ongoing: 종료까지 남은 분 / past: 0
 }
 
-export function describeBookingTiming(entry: TimetableEntry, now: Date): BookingTiming {
+export function describeBookingTiming(entry: { startTime: string; endTime: string }, now: Date): BookingTiming {
   const start = new Date(entry.startTime).getTime()
   const end = new Date(entry.endTime).getTime()
   const n = now.getTime()

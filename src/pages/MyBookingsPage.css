@@ -116,6 +116,13 @@
   filter: grayscale(0.5);
 }
 
+.booking-card.phase-cancelled {
+  opacity: 0.5;
+  background: var(--busy-soft);
+  border-color: var(--busy);
+  filter: grayscale(0.3);
+}
+
 .booking-card-top {
   display: flex;
   align-items: baseline;
@@ -151,6 +158,11 @@
 
 .phase-past .booking-status {
   color: var(--ink-faint);
+}
+
+.phase-cancelled .booking-status {
+  color: var(--busy);
+  font-weight: 700;
 }
 
 .booking-actions {
