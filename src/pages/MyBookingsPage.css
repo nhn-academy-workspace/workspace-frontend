@@ -116,6 +116,13 @@
   filter: grayscale(0.5);
 }
 
+.booking-card.phase-cancelled {
+  opacity: 0.5;
+  background: var(--busy-soft);
+  border-color: var(--busy);
+  filter: grayscale(0.3);
+}
+
 .booking-card-top {
   display: flex;
   align-items: baseline;
@@ -153,6 +160,11 @@
   color: var(--ink-faint);
 }
 
+.phase-cancelled .booking-status {
+  color: var(--busy);
+  font-weight: 700;
+}
+
 .booking-actions {
   display: flex;
   gap: 8px;
@@ -185,6 +197,14 @@
 }
 
 .booking-actions .early-return-button:hover:not(:disabled) {
+  background: var(--busy-soft);
+}
+
+.booking-actions .cancel-button {
+  color: var(--busy);
+}
+
+.booking-actions .cancel-button:hover:not(:disabled) {
   background: var(--busy-soft);
 }
 

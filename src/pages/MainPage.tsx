@@ -43,27 +43,34 @@ export default function MainPage() {
   useEffect(() => {
     let cancelled = false
 
-    getRooms()
-      .then((data) => {
-        if (cancelled) return
-        setRooms(data)
-        if (user?.role === 'STUDENT' && user.teamName) {
-          getMyTeamBookingsToday(data, user.teamName, toDateKey(new Date()))
-            .then((bookings) => {
-              if (!cancelled) setMyBookings(bookings)
-            })
-            .catch(() => {})
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setError('회의실 현황을 불러오지 못했습니다.')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+    const fetchRooms = () => {
+      getRooms()
+        .then((data) => {
+          if (cancelled) return
+          setRooms(data)
+          setError(null)
+          if (user?.role === 'STUDENT' && user.teamName) {
+            getMyTeamBookingsToday(data, user.teamName, toDateKey(new Date()))
+              .then((bookings) => {
+                if (!cancelled) setMyBookings(bookings)
+              })
+              .catch(() => {})
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setError('회의실 현황을 불러오지 못했습니다.')
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+    }
+
+    fetchRooms()
+    const pollTimer = setInterval(fetchRooms, 30_000)
 
     return () => {
       cancelled = true
+      clearInterval(pollTimer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

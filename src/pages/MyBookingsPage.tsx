@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
-import { getRooms, getRoomBookings } from '../api/rooms'
-import { getMyTeamBookingsToday, describeBookingTiming, formatMinutes, type MyBookingEntry } from '../api/myBooking'
-import { extendBooking, earlyReturnBooking, BookingError } from '../api/bookings'
+import { getRoomBookings } from '../api/rooms'
+import { getTeamBookingHistory, type TeamBookingHistoryEntry } from '../api/teamHistory'
+import { describeBookingTiming, formatMinutes } from '../api/myBooking'
+import { extendBooking, earlyReturnBooking, cancelBooking, BookingError } from '../api/bookings'
 import { getMyTeamRoster } from '../api/teams'
 import { getTeamUsage, type TeamUsage } from '../api/teamUsage'
 import { useAuth } from '../context/AuthContext'
@@ -38,12 +39,21 @@ function minutesOfDay(iso: string): number {
   return h * 60 + m
 }
 
+// 표시 우선순위: 진행 중/예정 > 종료됨 > 취소됨
+function sortRank(entry: TeamBookingHistoryEntry, now: Date): number {
+  if (entry.status === 'CANCELLED') return 3
+  const phase = describeBookingTiming(entry, now).phase
+  if (phase === 'ongoing') return 0
+  if (phase === 'upcoming') return 1
+  return 2
+}
+
 export default function MyBookingsPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const reduceMotion = useReducedMotion()
 
-  const [bookings, setBookings] = useState<MyBookingEntry[]>([])
+  const [bookings, setBookings] = useState<TeamBookingHistoryEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(() => new Date())
@@ -60,9 +70,10 @@ export default function MyBookingsPage() {
     if (!user?.teamName) return Promise.resolve()
     setLoading(true)
     setError(null)
-    return getRooms()
-      .then((rooms) => getMyTeamBookingsToday(rooms, user.teamName!, toDateKey(new Date())))
-      .then((data) => setBookings(data))
+    const todayKey = toDateKey(new Date())
+    return getMyTeamRoster()
+      .then((roster) => (roster.teamId ? getTeamBookingHistory(roster.teamId) : []))
+      .then((data) => setBookings(data.filter((e) => e.startTime.slice(0, 10) === todayKey)))
       .catch(() => setError('예약 정보를 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }
@@ -91,12 +102,12 @@ export default function MyBookingsPage() {
     setExtendMax(null)
   }
 
-  const openExtend = async (entry: MyBookingEntry) => {
-    if (extendingId === entry.id) {
+  const openExtend = async (entry: TeamBookingHistoryEntry) => {
+    if (extendingId === entry.bookingId) {
       closeExtend()
       return
     }
-    setExtendingId(entry.id)
+    setExtendingId(entry.bookingId)
     setExtendMax(null)
     setActionError(null)
     setExtendLoading(true)
@@ -107,15 +118,14 @@ export default function MyBookingsPage() {
 
       let maxEndAbs = CLOSE_MINUTES
       for (const e of roomEntries) {
-        if (e.id === entry.id && e.type === entry.type) continue
+        if (e.type === 'BOOKING' && e.id === entry.bookingId) continue
         const s = minutesOfDay(e.startTime)
         if (s > entryEnd && s < maxEndAbs) maxEndAbs = s
       }
 
-      const usedToday = bookings.reduce(
-        (sum, b) => sum + (minutesOfDay(b.endTime) - minutesOfDay(b.startTime)),
-        0,
-      )
+      const usedToday = bookings
+        .filter((b) => b.status !== 'CANCELLED')
+        .reduce((sum, b) => sum + (minutesOfDay(b.endTime) - minutesOfDay(b.startTime)), 0)
       const capRemaining = Math.max(DAILY_CAP_MINUTES - usedToday, 0)
       maxEndAbs = Math.min(maxEndAbs, entryEnd + capRemaining)
 
@@ -128,11 +138,11 @@ export default function MyBookingsPage() {
     }
   }
 
-  const confirmExtend = async (entry: MyBookingEntry, minutes: number) => {
-    setActionSubmitting(entry.id)
+  const confirmExtend = async (entry: TeamBookingHistoryEntry, minutes: number) => {
+    setActionSubmitting(entry.bookingId)
     setActionError(null)
     try {
-      await extendBooking(entry.id, addMinutesIso(entry.endTime, minutes))
+      await extendBooking(entry.bookingId, addMinutesIso(entry.endTime, minutes))
       closeExtend()
       await fetchBookings()
       fetchUsage()
@@ -143,11 +153,11 @@ export default function MyBookingsPage() {
     }
   }
 
-  const handleEarlyReturn = async (entry: MyBookingEntry) => {
-    setActionSubmitting(entry.id)
+  const handleEarlyReturn = async (entry: TeamBookingHistoryEntry) => {
+    setActionSubmitting(entry.bookingId)
     setActionError(null)
     try {
-      await earlyReturnBooking(entry.id)
+      await earlyReturnBooking(entry.bookingId)
       closeExtend()
       await fetchBookings()
       fetchUsage()
@@ -157,6 +167,28 @@ export default function MyBookingsPage() {
       setActionSubmitting(null)
     }
   }
+
+  const handleCancel = async (entry: TeamBookingHistoryEntry) => {
+    if (!window.confirm('이 예약을 취소할까요?')) return
+    setActionSubmitting(entry.bookingId)
+    setActionError(null)
+    try {
+      await cancelBooking(entry.bookingId)
+      closeExtend()
+      await fetchBookings()
+      fetchUsage()
+    } catch (err) {
+      setActionError(err instanceof BookingError ? err.message : '예약 취소에 실패했습니다. 잠시 후 다시 시도해주세요.')
+    } finally {
+      setActionSubmitting(null)
+    }
+  }
+
+  const sortedBookings = [...bookings].sort((a, b) => {
+    const rankDiff = sortRank(a, now) - sortRank(b, now)
+    if (rankDiff !== 0) return rankDiff
+    return a.startTime.localeCompare(b.startTime)
+  })
 
   return (
     <div className="my-bookings-page">
@@ -199,18 +231,22 @@ export default function MyBookingsPage() {
 
             {!loading && !error && actionError && <p className="state-message is-error">{actionError}</p>}
 
-            {!loading && !error && bookings.length > 0 && (
+            {!loading && !error && sortedBookings.length > 0 && (
               <div className="my-bookings-list">
-                {bookings.map((entry, i) => {
+                {sortedBookings.map((entry, i) => {
+                  const isCancelled = entry.status === 'CANCELLED'
                   const timing = describeBookingTiming(entry, now)
-                  const canOfferExtend = timing.phase === 'ongoing' && timing.minutes <= EXTEND_WINDOW
-                  const submitting = actionSubmitting === entry.id
-                  const isExtending = extendingId === entry.id
+                  const canOfferExtend =
+                    !isCancelled && timing.phase === 'ongoing' && timing.minutes <= EXTEND_WINDOW && entry.status === 'BOOKED'
+                  const canOfferEarlyReturn = !isCancelled && timing.phase === 'ongoing' && entry.status === 'BOOKED'
+                  const canOfferCancel = !isCancelled && timing.phase === 'upcoming' && entry.status === 'BOOKED'
+                  const submitting = actionSubmitting === entry.bookingId
+                  const isExtending = extendingId === entry.bookingId
 
                   return (
                     <motion.article
-                      key={entry.id}
-                      className={`booking-card phase-${timing.phase}`}
+                      key={entry.bookingId}
+                      className={`booking-card phase-${isCancelled ? 'cancelled' : timing.phase}`}
                       initial={{ opacity: 0, y: reduceMotion ? 0 : 14 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.06, duration: 0.35, ease: 'easeOut' }}
@@ -223,26 +259,39 @@ export default function MyBookingsPage() {
                       </div>
 
                       <p className="booking-status">
-                        {timing.phase === 'ongoing' && `지금 진행 중 · ${formatMinutes(timing.minutes)} 후 종료`}
-                        {timing.phase === 'upcoming' && `${formatMinutes(timing.minutes)} 후 시작`}
-                        {timing.phase === 'past' && '종료됨'}
+                        {isCancelled && '취소된 예약'}
+                        {!isCancelled && timing.phase === 'ongoing' && `지금 진행 중 · ${formatMinutes(timing.minutes)} 후 종료`}
+                        {!isCancelled && timing.phase === 'upcoming' && `${formatMinutes(timing.minutes)} 후 시작`}
+                        {!isCancelled && timing.phase === 'past' && '종료됨'}
                       </p>
 
-                      {timing.phase === 'ongoing' && (
+                      {(canOfferExtend || canOfferEarlyReturn || canOfferCancel) && (
                         <div className="booking-actions">
                           {canOfferExtend && (
                             <button type="button" onClick={() => openExtend(entry)} disabled={submitting}>
                               연장
                             </button>
                           )}
-                          <button
-                            type="button"
-                            className="early-return-button"
-                            onClick={() => handleEarlyReturn(entry)}
-                            disabled={submitting}
-                          >
-                            조기 반납
-                          </button>
+                          {canOfferEarlyReturn && (
+                            <button
+                              type="button"
+                              className="early-return-button"
+                              onClick={() => handleEarlyReturn(entry)}
+                              disabled={submitting}
+                            >
+                              조기 반납
+                            </button>
+                          )}
+                          {canOfferCancel && (
+                            <button
+                              type="button"
+                              className="cancel-button"
+                              onClick={() => handleCancel(entry)}
+                              disabled={submitting}
+                            >
+                              예약 취소
+                            </button>
+                          )}
                         </div>
                       )}
 

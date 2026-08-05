@@ -13,7 +13,7 @@ const END_HOUR = 18
 const OPEN_HOUR = 8
 const OPEN_MINUTE = 30
 const SLOT_MINUTES = 15
-const SLOT_HEIGHT = 32 // px per 15분
+const SLOT_HEIGHT = 48 // px per 15분 (15분 예약 블록에서 글씨가 잘리지 않도록 여유를 둠)
 const HOUR_HEIGHT = SLOT_HEIGHT * (60 / SLOT_MINUTES)
 const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60
 const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * HOUR_HEIGHT
@@ -88,6 +88,9 @@ export default function RoomTimetablePage() {
   const [draftRange, setDraftRange] = useState<DraftRange | null>(null)
   const [hoverSlot, setHoverSlot] = useState<number | null>(null)
 
+  const confirmPanelRef = useRef<HTMLDivElement>(null)
+  const [confirmPanelHeight, setConfirmPanelHeight] = useState(0)
+
   const [roster, setRoster] = useState<TeamMember[]>([])
   const [myMemberId, setMyMemberId] = useState<number | null>(null)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -97,8 +100,8 @@ export default function RoomTimetablePage() {
   const [actionSubmitting, setActionSubmitting] = useState<number | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [adjustingId, setAdjustingId] = useState<number | null>(null)
-  const [adjustStart, setAdjustStart] = useState('')
-  const [adjustEnd, setAdjustEnd] = useState('')
+  const [adjustRange, setAdjustRange] = useState<DraftRange | null>(null)
+  const [resizingEdge, setResizingEdge] = useState<'start' | 'end' | null>(null)
   const [lockReason, setLockReason] = useState('')
   const [deletingLockId, setDeletingLockId] = useState<number | null>(null)
 
@@ -154,6 +157,22 @@ export default function RoomTimetablePage() {
     return () => clearInterval(timer)
   }, [])
 
+  // 예약 확정 패널(fixed)이 타임라인 하단(17~18시 부근)을 가려서 그 아래로 스크롤할 방법이
+  // 없어지는 문제를 막기 위해, 패널 높이만큼 콘텐츠 하단에 여백을 확보한다.
+  useEffect(() => {
+    if (!draftRange) {
+      setConfirmPanelHeight(0)
+      return
+    }
+    const el = confirmPanelRef.current
+    if (!el) return
+    const updateHeight = () => setConfirmPanelHeight(el.offsetHeight)
+    updateHeight()
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [draftRange])
+
   const shiftDay = (delta: number) => {
     setDate((prev) => {
       const next = new Date(prev)
@@ -163,13 +182,15 @@ export default function RoomTimetablePage() {
   }
 
   // 기존 예약/락을 offset-분 구간으로 변환
+  // TA가 락을 걸 때는 예약을 무시하고 드래그할 수 있어야 하므로(겹치는 예약은 백엔드에서 자동 조정),
+  // 락 걸기 모드에서는 다른 락만 충돌 대상으로 취급한다.
   const occupied = useMemo(
     () =>
-      entries.map((e) => ({
+      (canLock ? entries.filter((e) => e.type === 'LOCK') : entries).map((e) => ({
         start: offsetFromStart(minutesOfDay(e.startTime)),
         end: offsetFromStart(minutesOfDay(e.endTime)),
       })),
-    [entries],
+    [entries, canLock],
   )
 
   const isSlotFree = (start: number, end: number) =>
@@ -194,6 +215,50 @@ export default function RoomTimetablePage() {
   }
 
   const isPastSlot = (start: number) => isToday && start + START_HOUR * 60 < nowMinutes
+
+  // 조정 중인 예약 자신은 충돌 대상에서 제외한 다른 예약/락 목록
+  const adjustOccupied = useMemo(
+    () =>
+      entries
+        .filter((e) => !(e.type === 'BOOKING' && e.id === adjustingId))
+        .map((e) => ({
+          start: offsetFromStart(minutesOfDay(e.startTime)),
+          end: offsetFromStart(minutesOfDay(e.endTime)),
+        })),
+    [entries, adjustingId],
+  )
+
+  const handleResizePointerDown = (e: React.PointerEvent, edge: 'start' | 'end') => {
+    e.stopPropagation()
+    ;(e.target as Element).setPointerCapture(e.pointerId)
+    setResizingEdge(edge)
+  }
+
+  const handleResizePointerMove = (e: React.PointerEvent) => {
+    if (!resizingEdge) return
+    e.stopPropagation()
+    const slot = offsetFromPointer(e.clientY)
+    setAdjustRange((prev) => {
+      if (!prev) return prev
+      if (resizingEdge === 'start') {
+        let minStart = 0
+        for (const o of adjustOccupied) {
+          if (o.end <= prev.end && o.end > minStart) minStart = o.end
+        }
+        return { start: Math.min(Math.max(slot, minStart), prev.end - SLOT_MINUTES), end: prev.end }
+      }
+      let maxEnd = TOTAL_MINUTES
+      for (const o of adjustOccupied) {
+        if (o.start >= prev.start && o.start < maxEnd) maxEnd = o.start
+      }
+      return { start: prev.start, end: Math.max(Math.min(slot + SLOT_MINUTES, maxEnd), prev.start + SLOT_MINUTES) }
+    })
+  }
+
+  const handleResizePointerUp = (e: React.PointerEvent) => {
+    e.stopPropagation()
+    setResizingEdge(null)
+  }
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (!canDrag) return
@@ -273,17 +338,28 @@ export default function RoomTimetablePage() {
 
   const openAdjust = (entry: TimetableEntry) => {
     setAdjustingId(entry.id)
-    setAdjustStart(formatTime(entry.startTime))
-    setAdjustEnd(formatTime(entry.endTime))
+    setAdjustRange({
+      start: offsetFromStart(minutesOfDay(entry.startTime)),
+      end: offsetFromStart(minutesOfDay(entry.endTime)),
+    })
     setActionError(null)
   }
 
+  const closeAdjust = () => {
+    setAdjustingId(null)
+    setAdjustRange(null)
+    setResizingEdge(null)
+  }
+
   const submitAdjust = async (bookingId: number) => {
+    if (!adjustRange) return
     setActionSubmitting(bookingId)
     setActionError(null)
     try {
-      await adjustBooking(bookingId, `${dateKey}T${adjustStart}:00`, `${dateKey}T${adjustEnd}:00`)
-      setAdjustingId(null)
+      const startTime = `${dateKey}T${minutesToHHMM(adjustRange.start + START_HOUR * 60)}:00`
+      const endTime = `${dateKey}T${minutesToHHMM(adjustRange.end + START_HOUR * 60)}:00`
+      await adjustBooking(bookingId, startTime, endTime)
+      closeAdjust()
       await fetchEntries()
     } catch (err) {
       setActionError(err instanceof AdminActionError ? err.message : '예약 조정에 실패했습니다.')
@@ -332,7 +408,10 @@ export default function RoomTimetablePage() {
         <h1>{room?.name ?? `회의실 ${roomId}`}</h1>
       </header>
 
-      <main className="timetable-content">
+      <main
+        className="timetable-content"
+        style={confirmPanelHeight ? { paddingBottom: confirmPanelHeight + 24 } : undefined}
+      >
         <div className="date-nav">
           <button type="button" onClick={() => shiftDay(-1)} aria-label="이전 날짜">
             ‹
@@ -352,8 +431,11 @@ export default function RoomTimetablePage() {
         {user?.role === 'STUDENT' && canBook && (
           <p className="drag-hint">빈 시간대를 눌러서 아래로 드래그하면 예약 시간을 정할 수 있어요.</p>
         )}
-        {canLock && (
+        {canLock && adjustingId === null && (
           <p className="drag-hint">빈 시간대를 드래그하면 락을 걸 수 있어요. 락/취소 버튼은 각 블록에 있어요.</p>
+        )}
+        {adjustingId !== null && (
+          <p className="drag-hint">블록 위아래 끝의 손잡이를 드래그해서 시간을 조정한 다음 저장을 눌러주세요.</p>
         )}
 
         {loading && <p className="state-message">불러오는 중...</p>}
@@ -375,23 +457,33 @@ export default function RoomTimetablePage() {
 
               <div className="timeline-blocks">
                 {entries.map((entry, i) => {
-                  const startOffset = offsetFromStart(minutesOfDay(entry.startTime))
-                  const endOffset = offsetFromStart(minutesOfDay(entry.endTime))
+                  const isAdjustingThis = entry.type === 'BOOKING' && adjustingId === entry.id && !!adjustRange
+                  const startOffset = isAdjustingThis
+                    ? adjustRange!.start
+                    : offsetFromStart(minutesOfDay(entry.startTime))
+                  const endOffset = isAdjustingThis ? adjustRange!.end : offsetFromStart(minutesOfDay(entry.endTime))
                   const top = offsetToTop(startOffset)
                   const height = Math.max(offsetToTop(endOffset) - offsetToTop(startOffset), 20)
                   const isPast = new Date(entry.endTime).getTime() <= now.getTime()
+                  const displayStart = isAdjustingThis
+                    ? minutesToHHMM(adjustRange!.start + START_HOUR * 60)
+                    : formatTime(entry.startTime)
+                  const displayEnd = isAdjustingThis
+                    ? minutesToHHMM(adjustRange!.end + START_HOUR * 60)
+                    : formatTime(entry.endTime)
+                  const submittingThis = actionSubmitting === entry.id
 
                   return (
                     <motion.div
                       key={`${entry.type}-${entry.id}`}
-                      className={`timeline-block entry-${entry.type.toLowerCase()}${isPast ? ' is-past' : ''}`}
+                      className={`timeline-block entry-${entry.type.toLowerCase()}${isPast ? ' is-past' : ''}${isAdjustingThis ? ' is-adjusting' : ''}`}
                       style={{ top, height }}
                       initial={{ opacity: 0, scaleY: reduceMotion ? 1 : 0.6 }}
                       animate={{ opacity: 1, scaleY: 1 }}
                       transition={{ delay: i * 0.05, duration: 0.3, ease: 'easeOut' }}
                     >
                       <span className="block-time">
-                        {formatTime(entry.startTime)}–{formatTime(entry.endTime)}
+                        {displayStart}–{displayEnd}
                       </span>
                       <span className="block-label">{entryLabel(entry)}</span>
 
@@ -399,20 +491,10 @@ export default function RoomTimetablePage() {
                         <div className="admin-block-actions" onPointerDown={(e) => e.stopPropagation()}>
                           {adjustingId === entry.id ? (
                             <>
-                              <input
-                                type="time"
-                                value={adjustStart}
-                                onChange={(e) => setAdjustStart(e.target.value)}
-                              />
-                              <input type="time" value={adjustEnd} onChange={(e) => setAdjustEnd(e.target.value)} />
-                              <button
-                                type="button"
-                                disabled={actionSubmitting === entry.id}
-                                onClick={() => submitAdjust(entry.id)}
-                              >
+                              <button type="button" disabled={submittingThis} onClick={() => submitAdjust(entry.id)}>
                                 저장
                               </button>
-                              <button type="button" onClick={() => setAdjustingId(null)}>
+                              <button type="button" onClick={closeAdjust}>
                                 취소
                               </button>
                             </>
@@ -420,14 +502,14 @@ export default function RoomTimetablePage() {
                             <>
                               <button
                                 type="button"
-                                disabled={actionSubmitting === entry.id}
+                                disabled={submittingThis}
                                 onClick={() => openAdjust(entry)}
                               >
                                 조정
                               </button>
                               <button
                                 type="button"
-                                disabled={actionSubmitting === entry.id}
+                                disabled={submittingThis}
                                 onClick={() => handleCancelBooking(entry.id)}
                               >
                                 취소
@@ -435,6 +517,23 @@ export default function RoomTimetablePage() {
                             </>
                           )}
                         </div>
+                      )}
+
+                      {isAdjustingThis && !submittingThis && (
+                        <>
+                          <div
+                            className="resize-handle resize-handle-top"
+                            onPointerDown={(e) => handleResizePointerDown(e, 'start')}
+                            onPointerMove={handleResizePointerMove}
+                            onPointerUp={handleResizePointerUp}
+                          />
+                          <div
+                            className="resize-handle resize-handle-bottom"
+                            onPointerDown={(e) => handleResizePointerDown(e, 'end')}
+                            onPointerMove={handleResizePointerMove}
+                            onPointerUp={handleResizePointerUp}
+                          />
+                        </>
                       )}
 
                       {user?.role === 'TA' && entry.type === 'LOCK' && (
@@ -502,6 +601,7 @@ export default function RoomTimetablePage() {
       <AnimatePresence>
         {draftRange && (
           <motion.div
+            ref={confirmPanelRef}
             className="confirm-panel"
             initial={{ y: '100%' }}
             animate={{ y: 0 }}

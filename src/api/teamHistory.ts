@@ -2,6 +2,7 @@ export type TeamBookingStatus = 'BOOKED' | 'CANCELLED' | 'EARLY_RETURNED' | 'COM
 
 export interface TeamBookingHistoryEntry {
   bookingId: number
+  roomId: number
   roomName: string
   startTime: string
   endTime: string

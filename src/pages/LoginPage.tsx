@@ -1,9 +1,16 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion, AnimatePresence } from 'framer-motion'
 import { login, LoginError } from '../api/auth'
+import { getRooms, type Room } from '../api/rooms'
 import { useAuth } from '../context/AuthContext'
 import './LoginPage.css'
+
+const roomStatusLabel: Record<Room['status'], string> = {
+  AVAILABLE: '사용 가능',
+  OCCUPIED: '사용 중',
+  LOCK: 'TA 업무 중',
+}
 
 function BrandMark() {
   return (
@@ -17,34 +24,43 @@ function BrandMark() {
 
 function RoomPreview() {
   const reduceMotion = useReducedMotion()
+  const [rooms, setRooms] = useState<Room[]>([])
 
-  const rooms = [
-    { name: '회의실 1', status: '사용 가능', busy: false },
-    { name: '회의실 2', status: '사용 중 · 13:00까지', busy: true },
-  ]
+  useEffect(() => {
+    let cancelled = false
+    getRooms()
+      .then((data) => {
+        if (!cancelled) setRooms(data)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (rooms.length === 0) return null
 
   return (
     <div className="room-preview">
-      {rooms.map((room, i) => (
-        <motion.div
-          key={room.name}
-          className={`room-pill ${room.busy ? 'is-busy' : 'is-open'}`}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 + i * 0.12, duration: 0.5, ease: 'easeOut' }}
-        >
-          <span
-            className="room-dot"
-            style={
-              room.busy && !reduceMotion
-                ? { animation: 'pulse 2s ease-in-out infinite' }
-                : undefined
-            }
-          />
-          <span className="room-name">{room.name}</span>
-          <span className="room-status">{room.status}</span>
-        </motion.div>
-      ))}
+      {rooms.map((room, i) => {
+        const busy = room.status !== 'AVAILABLE'
+        return (
+          <motion.div
+            key={room.id}
+            className={`room-pill ${busy ? 'is-busy' : 'is-open'}`}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 + i * 0.12, duration: 0.5, ease: 'easeOut' }}
+          >
+            <span
+              className="room-dot"
+              style={busy && !reduceMotion ? { animation: 'pulse 2s ease-in-out infinite' } : undefined}
+            />
+            <span className="room-name">{room.name}</span>
+            <span className="room-status">{roomStatusLabel[room.status]}</span>
+          </motion.div>
+        )
+      })}
     </div>
   )
 }
