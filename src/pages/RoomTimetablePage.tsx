@@ -88,6 +88,9 @@ export default function RoomTimetablePage() {
   const [draftRange, setDraftRange] = useState<DraftRange | null>(null)
   const [hoverSlot, setHoverSlot] = useState<number | null>(null)
 
+  const confirmPanelRef = useRef<HTMLDivElement>(null)
+  const [confirmPanelHeight, setConfirmPanelHeight] = useState(0)
+
   const [roster, setRoster] = useState<TeamMember[]>([])
   const [myMemberId, setMyMemberId] = useState<number | null>(null)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -153,6 +156,22 @@ export default function RoomTimetablePage() {
     const timer = setInterval(() => setNow(new Date()), 60_000)
     return () => clearInterval(timer)
   }, [])
+
+  // 예약 확정 패널(fixed)이 타임라인 하단(17~18시 부근)을 가려서 그 아래로 스크롤할 방법이
+  // 없어지는 문제를 막기 위해, 패널 높이만큼 콘텐츠 하단에 여백을 확보한다.
+  useEffect(() => {
+    if (!draftRange) {
+      setConfirmPanelHeight(0)
+      return
+    }
+    const el = confirmPanelRef.current
+    if (!el) return
+    const updateHeight = () => setConfirmPanelHeight(el.offsetHeight)
+    updateHeight()
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [draftRange])
 
   const shiftDay = (delta: number) => {
     setDate((prev) => {
@@ -334,7 +353,10 @@ export default function RoomTimetablePage() {
         <h1>{room?.name ?? `회의실 ${roomId}`}</h1>
       </header>
 
-      <main className="timetable-content">
+      <main
+        className="timetable-content"
+        style={confirmPanelHeight ? { paddingBottom: confirmPanelHeight + 24 } : undefined}
+      >
         <div className="date-nav">
           <button type="button" onClick={() => shiftDay(-1)} aria-label="이전 날짜">
             ‹
@@ -504,6 +526,7 @@ export default function RoomTimetablePage() {
       <AnimatePresence>
         {draftRange && (
           <motion.div
+            ref={confirmPanelRef}
             className="confirm-panel"
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
