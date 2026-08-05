@@ -265,12 +265,45 @@
   cursor: not-allowed;
 }
 
-.admin-block-actions input[type='time'] {
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  font-size: 11px;
-  padding: 2px 4px;
-  width: 68px;
+.timeline-block.is-adjusting {
+  z-index: 10;
+  border: 2px dashed var(--accent);
+  background: var(--accent-soft);
+}
+
+.timeline-block.is-adjusting .block-label,
+.timeline-block.is-adjusting .block-time {
+  color: var(--accent-strong);
+}
+
+.resize-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 16px;
+  cursor: ns-resize;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.resize-handle-top {
+  top: -8px;
+}
+
+.resize-handle-bottom {
+  bottom: -8px;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 28px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--accent);
 }
 
 .now-line {
