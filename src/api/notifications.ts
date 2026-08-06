@@ -17,3 +17,16 @@ export async function requestTelegramLink(): Promise<string> {
   const data: { deepLink: string } = await res.json()
   return data.deepLink
 }
+
+export async function getTelegramLinkStatus(): Promise<boolean> {
+  const res = await fetch(`${API_V1}/members/me/telegram-link`, {
+    credentials: 'include',
+  })
+
+  if (!res.ok) {
+    return false
+  }
+
+  const data: { linked: boolean } = await res.json()
+  return data.linked
+}
