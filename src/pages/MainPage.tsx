@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { getRooms, type Room } from '../api/rooms'
 import { getMyTeamBookingsToday, describeBookingTiming, formatMinutes, type MyBookingEntry } from '../api/myBooking'
+import { requestTelegramLink } from '../api/notifications'
 import './MainPage.css'
 
 function toDateKey(date: Date): string {
@@ -87,6 +88,22 @@ export default function MainPage() {
     navigate('/login', { replace: true })
   }
 
+  const [telegramLinking, setTelegramLinking] = useState(false)
+  const [telegramLinkError, setTelegramLinkError] = useState<string | null>(null)
+
+  const handleTelegramLink = async () => {
+    setTelegramLinking(true)
+    setTelegramLinkError(null)
+    try {
+      const deepLink = await requestTelegramLink()
+      window.open(deepLink, '_blank', 'noopener,noreferrer')
+    } catch {
+      setTelegramLinkError('텔레그램 연동에 실패했습니다. 잠시 후 다시 시도해주세요.')
+    } finally {
+      setTelegramLinking(false)
+    }
+  }
+
   return (
     <div className="main-page">
       <header className="main-header">
@@ -105,6 +122,9 @@ export default function MainPage() {
               {user.name}님
             </span>
           )}
+          <button type="button" className="logout-button" onClick={handleTelegramLink} disabled={telegramLinking}>
+            {telegramLinking ? '연동 중...' : '텔레그램 연동'}
+          </button>
           <button type="button" className="logout-button" onClick={() => navigate('/change-password')}>
             비밀번호 변경
           </button>
@@ -123,6 +143,8 @@ export default function MainPage() {
           <h1>환영합니다, {user?.name ?? '사용자'}님</h1>
           <p className="content-sub">지금 회의실 사용 현황을 확인하고 바로 예약해보세요.</p>
         </motion.div>
+
+        {telegramLinkError && <p className="state-message is-error">{telegramLinkError}</p>}
 
         {user?.role === 'STUDENT' && (
           <motion.article
