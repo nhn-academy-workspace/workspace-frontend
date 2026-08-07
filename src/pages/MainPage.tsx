@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { getRooms, type Room } from '../api/rooms'
 import { getMyTeamBookingsToday, describeBookingTiming, formatMinutes, type MyBookingEntry } from '../api/myBooking'
-import { requestTelegramLink } from '../api/notifications'
+import { getTelegramLinkStatus, requestTelegramLink } from '../api/notifications'
 import './MainPage.css'
 
 function toDateKey(date: Date): string {
@@ -90,6 +90,26 @@ export default function MainPage() {
 
   const [telegramLinking, setTelegramLinking] = useState(false)
   const [telegramLinkError, setTelegramLinkError] = useState<string | null>(null)
+  const [telegramLinked, setTelegramLinked] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const checkStatus = () => {
+      getTelegramLinkStatus().then((linked) => {
+        if (!cancelled) setTelegramLinked(linked)
+      })
+    }
+
+    checkStatus()
+    // 딥링크는 새 탭에서 완료되니, 이 탭으로 돌아왔을 때 다시 확인해서 버튼 상태를 갱신
+    window.addEventListener('focus', checkStatus)
+
+    return () => {
+      cancelled = true
+      window.removeEventListener('focus', checkStatus)
+    }
+  }, [])
 
   const handleTelegramLink = async () => {
     setTelegramLinking(true)
@@ -122,9 +142,11 @@ export default function MainPage() {
               {user.name}님
             </span>
           )}
-          <button type="button" className="logout-button" onClick={handleTelegramLink} disabled={telegramLinking}>
-            {telegramLinking ? '연동 중...' : '텔레그램 연동'}
-          </button>
+          {!telegramLinked && (
+            <button type="button" className="logout-button" onClick={handleTelegramLink} disabled={telegramLinking}>
+              {telegramLinking ? '연동 중...' : '텔레그램 연동'}
+            </button>
+          )}
           <button type="button" className="logout-button" onClick={() => navigate('/change-password')}>
             비밀번호 변경
           </button>
