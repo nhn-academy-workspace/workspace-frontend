@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { getRooms, type Room } from '../api/rooms'
 import { getMyTeamBookingsToday, describeBookingTiming, formatMinutes, type MyBookingEntry } from '../api/myBooking'
-import { getTelegramLinkStatus, requestTelegramLink } from '../api/notifications'
 import './MainPage.css'
 
 function toDateKey(date: Date): string {
@@ -30,7 +29,7 @@ const statusLabel: Record<Room['status'], string> = {
 }
 
 export default function MainPage() {
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const reduceMotion = useReducedMotion()
 
@@ -83,47 +82,6 @@ export default function MainPage() {
 
   const upcomingOrOngoing = myBookings.find((b) => describeBookingTiming(b, now).phase !== 'past')
 
-  const handleLogout = async () => {
-    await logout()
-    navigate('/login', { replace: true })
-  }
-
-  const [telegramLinking, setTelegramLinking] = useState(false)
-  const [telegramLinkError, setTelegramLinkError] = useState<string | null>(null)
-  const [telegramLinked, setTelegramLinked] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-
-    const checkStatus = () => {
-      getTelegramLinkStatus().then((linked) => {
-        if (!cancelled) setTelegramLinked(linked)
-      })
-    }
-
-    checkStatus()
-    // 딥링크는 새 탭에서 완료되니, 이 탭으로 돌아왔을 때 다시 확인해서 버튼 상태를 갱신
-    window.addEventListener('focus', checkStatus)
-
-    return () => {
-      cancelled = true
-      window.removeEventListener('focus', checkStatus)
-    }
-  }, [])
-
-  const handleTelegramLink = async () => {
-    setTelegramLinking(true)
-    setTelegramLinkError(null)
-    try {
-      const deepLink = await requestTelegramLink()
-      window.open(deepLink, '_blank', 'noopener,noreferrer')
-    } catch {
-      setTelegramLinkError('텔레그램 연동에 실패했습니다. 잠시 후 다시 시도해주세요.')
-    } finally {
-      setTelegramLinking(false)
-    }
-  }
-
   return (
     <div className="main-page">
       <header className="main-header">
@@ -137,22 +95,11 @@ export default function MainPage() {
         </div>
         <div className="main-user">
           {user && (
-            <span className="user-chip">
+            <button type="button" className="user-chip" onClick={() => navigate('/my-page')}>
               <span className="role-badge">{roleLabel[user.role] ?? user.role}</span>
               {user.name}님
-            </span>
-          )}
-          {!telegramLinked && (
-            <button type="button" className="logout-button" onClick={handleTelegramLink} disabled={telegramLinking}>
-              {telegramLinking ? '연동 중...' : '텔레그램 연동'}
             </button>
           )}
-          <button type="button" className="logout-button" onClick={() => navigate('/change-password')}>
-            비밀번호 변경
-          </button>
-          <button type="button" className="logout-button" onClick={handleLogout}>
-            로그아웃
-          </button>
         </div>
       </header>
 
@@ -165,8 +112,6 @@ export default function MainPage() {
           <h1>환영합니다, {user?.name ?? '사용자'}님</h1>
           <p className="content-sub">지금 회의실 사용 현황을 확인하고 바로 예약해보세요.</p>
         </motion.div>
-
-        {telegramLinkError && <p className="state-message is-error">{telegramLinkError}</p>}
 
         {user?.role === 'STUDENT' && (
           <motion.article

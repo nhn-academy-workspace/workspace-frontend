@@ -123,15 +123,25 @@
   border-top: none;
 }
 
+.admin-member-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin-right: auto;
+}
+
 .admin-member-name {
   color: var(--ink);
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .admin-member-login {
   color: var(--ink-faint);
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
-  margin-right: auto;
+  white-space: nowrap;
 }
 
 .admin-reassign-select {
@@ -183,10 +193,40 @@
 
 @media (max-width: 640px) {
   .admin-teams-header {
-    padding: 14px 20px;
+    padding: 14px 16px;
   }
 
   .admin-teams-content {
-    padding: 24px 20px 48px;
+    padding: 20px 16px 48px;
+  }
+
+  /* 멤버 행: 2줄 레이아웃 (1행: 이름+학번 블록+호출 / 2행: select+이동) */
+  .admin-member-list li {
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    align-items: center;
+  }
+
+  /* info 블록(이름+학번)이 1행을 채움 */
+  .admin-member-info {
+    order: 1;
+    flex: 1;
+    margin-right: 0;
+  }
+
+  /* 개인 호출 버튼 → 1행 끝 */
+  .admin-member-list li .admin-call-button {
+    order: 2;
+  }
+
+  /* select + 이동 버튼 → 2행 */
+  .admin-reassign-select {
+    order: 3;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .admin-reassign-button {
+    order: 4;
   }
 }

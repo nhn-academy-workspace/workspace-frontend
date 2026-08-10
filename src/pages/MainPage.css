@@ -36,6 +36,17 @@
   gap: 8px;
   font-size: 14px;
   color: var(--ink-soft);
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.user-chip:hover {
+  background: var(--paper);
+  color: var(--ink);
 }
 
 .role-badge {
@@ -228,11 +239,7 @@
 
 @media (max-width: 640px) {
   .main-header {
-    padding: 14px 20px;
-  }
-
-  .user-chip {
-    display: none;
+    padding: 12px 16px;
   }
 
   .main-content {

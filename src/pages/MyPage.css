@@ -1,0 +1,184 @@
+.my-page {
+  min-height: 100svh;
+  background: var(--paper);
+}
+
+.my-page-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 32px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.my-page-header .back-button {
+  border: none;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.my-page-header .back-button:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.my-page-header h1 {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--ink);
+}
+
+.my-page-content {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 32px 32px 64px;
+}
+
+.my-page-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.my-section {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.my-profile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.my-profile-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.role-badge {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.profile-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.profile-team {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin: 0 0 14px;
+}
+
+.section-desc {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+.telegram-linked {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ok);
+  margin: 0;
+}
+
+.my-error {
+  color: var(--busy);
+  font-size: 13px;
+  margin: 0 0 10px;
+}
+
+.my-action-button {
+  width: 100%;
+  border: none;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 11px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.my-action-button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.my-action-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.my-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.nav-arrow {
+  color: var(--ink-faint);
+  font-size: 16px;
+}
+
+.my-logout-button {
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--busy);
+  cursor: pointer;
+  text-align: left;
+}
+
+@media (max-width: 640px) {
+  .my-page-header {
+    padding: 14px 16px;
+  }
+
+  .my-page-content {
+    padding: 24px 16px 48px;
+  }
+}

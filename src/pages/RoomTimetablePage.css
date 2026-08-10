@@ -512,3 +512,9 @@
     padding: 16px 20px calc(16px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+@media (prefers-color-scheme: dark) {
+  .minor-line {
+    opacity: 0.65;
+  }
+}
