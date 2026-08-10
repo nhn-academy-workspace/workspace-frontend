@@ -1,3 +1,5 @@
+import { apiFetch } from './client'
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 const API_V1 = `${API_BASE}/api/v1`
 
@@ -14,7 +16,7 @@ export interface AdminTeam {
 }
 
 export async function getAdminTeams(): Promise<AdminTeam[]> {
-  const res = await fetch(`${API_V1}/admin/teams`, { credentials: 'include' })
+  const res = await apiFetch(`${API_V1}/admin/teams`, { credentials: 'include' })
   if (!res.ok) {
     throw new Error('팀 목록을 불러오지 못했습니다.')
   }
@@ -22,7 +24,7 @@ export async function getAdminTeams(): Promise<AdminTeam[]> {
 }
 
 export async function changeMemberTeam(memberId: number, teamId: number): Promise<void> {
-  const res = await fetch(`${API_V1}/admin/members/${memberId}`, {
+  const res = await apiFetch(`${API_V1}/admin/members/${memberId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -39,7 +41,7 @@ export async function callTarget(
   targetId: number,
   message: string,
 ): Promise<void> {
-  const res = await fetch(`${API_V1}/admin/calls`, {
+  const res = await apiFetch(`${API_V1}/admin/calls`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',

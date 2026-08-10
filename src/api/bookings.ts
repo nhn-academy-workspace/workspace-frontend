@@ -15,11 +15,13 @@ export interface BookingResult {
 
 export class BookingError extends Error {}
 
+import { apiFetch } from './client'
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 const API_V1 = `${API_BASE}/api/v1`
 
 export async function createBooking(payload: CreateBookingPayload): Promise<BookingResult> {
-  const res = await fetch(`${API_V1}/bookings`, {
+  const res = await apiFetch(`${API_V1}/bookings`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -35,7 +37,7 @@ export async function createBooking(payload: CreateBookingPayload): Promise<Book
 }
 
 export async function extendBooking(bookingId: number, endTime: string): Promise<BookingResult> {
-  const res = await fetch(`${API_V1}/bookings/${bookingId}/extend`, {
+  const res = await apiFetch(`${API_V1}/bookings/${bookingId}/extend`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -51,7 +53,7 @@ export async function extendBooking(bookingId: number, endTime: string): Promise
 }
 
 export async function earlyReturnBooking(bookingId: number): Promise<{ status: string }> {
-  const res = await fetch(`${API_V1}/bookings/${bookingId}/early-return`, {
+  const res = await apiFetch(`${API_V1}/bookings/${bookingId}/early-return`, {
     method: 'PATCH',
     credentials: 'include',
   })
@@ -65,7 +67,7 @@ export async function earlyReturnBooking(bookingId: number): Promise<{ status: s
 }
 
 export async function cancelBooking(bookingId: number): Promise<{ status: string }> {
-  const res = await fetch(`${API_V1}/bookings/${bookingId}/cancel`, {
+  const res = await apiFetch(`${API_V1}/bookings/${bookingId}/cancel`, {
     method: 'PATCH',
     credentials: 'include',
   })

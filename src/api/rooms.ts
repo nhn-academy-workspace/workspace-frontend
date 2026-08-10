@@ -17,11 +17,13 @@ export interface TimetableEntry {
   reason: string | null
 }
 
+import { apiFetch } from './client'
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 const API_V1 = `${API_BASE}/api/v1`
 
 export async function getRooms(): Promise<Room[]> {
-  const res = await fetch(`${API_V1}/rooms`, { credentials: 'include' })
+  const res = await apiFetch(`${API_V1}/rooms`, { credentials: 'include' })
   if (!res.ok) {
     throw new Error('회의실 목록을 불러오지 못했습니다.')
   }
@@ -30,7 +32,7 @@ export async function getRooms(): Promise<Room[]> {
 
 export async function getRoomBookings(roomId: number, date?: string): Promise<TimetableEntry[]> {
   const query = date ? `?date=${date}` : ''
-  const res = await fetch(`${API_V1}/rooms/${roomId}/bookings${query}`, {
+  const res = await apiFetch(`${API_V1}/rooms/${roomId}/bookings${query}`, {
     credentials: 'include',
   })
   if (!res.ok) {
