@@ -84,6 +84,7 @@ export default function RoomTimetablePage() {
   const [now, setNow] = useState(() => new Date())
 
   const trackRef = useRef<HTMLDivElement>(null)
+  const timelineRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState(false)
   const [draftRange, setDraftRange] = useState<DraftRange | null>(null)
   const [hoverSlot, setHoverSlot] = useState<number | null>(null)
@@ -207,7 +208,7 @@ export default function RoomTimetablePage() {
   }
 
   const offsetFromPointer = (clientY: number) => {
-    const rect = trackRef.current?.getBoundingClientRect()
+    const rect = timelineRef.current?.getBoundingClientRect()
     if (!rect) return 0
     const relY = clientY - rect.top
     const minutes = (relY / HOUR_HEIGHT) * 60
@@ -471,7 +472,7 @@ export default function RoomTimetablePage() {
 
         {!loading && !error && (
           <>
-            <div className="timeline" style={{ height: TOTAL_HEIGHT }}>
+            <div ref={timelineRef} className="timeline" style={{ height: TOTAL_HEIGHT }}>
               {HOURS.map((h, i) => (
                 <div key={h} className="hour-row" style={{ top: i * HOUR_HEIGHT }}>
                   <span className="hour-label">{h}:00</span>
@@ -530,7 +531,7 @@ export default function RoomTimetablePage() {
                             <>
                               <button
                                 type="button"
-                                disabled={submittingThis}
+                                disabled={submittingThis || !!draftRange}
                                 onClick={() => openAdjust(entry)}
                               >
                                 조정
@@ -609,7 +610,7 @@ export default function RoomTimetablePage() {
                 </div>
               )}
 
-              {canDrag && (
+              {canDrag && adjustingId === null && (
                 <div
                   ref={trackRef}
                   className="drag-track"

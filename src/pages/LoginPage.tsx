@@ -148,7 +148,7 @@ export default function LoginPage() {
               name="loginId"
               type="text"
               autoComplete="username"
-              placeholder="예: 20260123"
+              placeholder="예: ATGG_03_000"
               value={loginId}
               onChange={(e) => setLoginId(e.target.value)}
               disabled={submitting}
