@@ -1,3 +1,5 @@
+import { apiFetch } from './client'
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 const API_V1 = `${API_BASE}/api/v1`
 
@@ -20,7 +22,7 @@ async function handle(res: Response, fallback: string) {
 }
 
 export async function adjustBooking(bookingId: number, startTime: string, endTime: string): Promise<BookingResult> {
-  const res = await fetch(`${API_V1}/admin/bookings/${bookingId}/adjust`, {
+  const res = await apiFetch(`${API_V1}/admin/bookings/${bookingId}/adjust`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -30,7 +32,7 @@ export async function adjustBooking(bookingId: number, startTime: string, endTim
 }
 
 export async function cancelBooking(bookingId: number): Promise<BookingResult> {
-  const res = await fetch(`${API_V1}/admin/bookings/${bookingId}/cancel`, {
+  const res = await apiFetch(`${API_V1}/admin/bookings/${bookingId}/cancel`, {
     method: 'PATCH',
     credentials: 'include',
   })
@@ -53,7 +55,7 @@ export interface LockResult {
 }
 
 export async function createLock(payload: CreateLockPayload): Promise<LockResult> {
-  const res = await fetch(`${API_V1}/admin/room-locks`, {
+  const res = await apiFetch(`${API_V1}/admin/room-locks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -63,7 +65,7 @@ export async function createLock(payload: CreateLockPayload): Promise<LockResult
 }
 
 export async function deleteLock(lockId: number): Promise<void> {
-  const res = await fetch(`${API_V1}/admin/room-locks/${lockId}`, {
+  const res = await apiFetch(`${API_V1}/admin/room-locks/${lockId}`, {
     method: 'DELETE',
     credentials: 'include',
   })

@@ -1,10 +1,12 @@
+import { apiFetch } from './client'
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 const API_V1 = `${API_BASE}/api/v1`
 
 export class TelegramLinkError extends Error {}
 
 export async function requestTelegramLink(): Promise<string> {
-  const res = await fetch(`${API_V1}/members/me/telegram-link`, {
+  const res = await apiFetch(`${API_V1}/members/me/telegram-link`, {
     method: 'POST',
     credentials: 'include',
   })
@@ -19,7 +21,7 @@ export async function requestTelegramLink(): Promise<string> {
 }
 
 export async function getTelegramLinkStatus(): Promise<boolean> {
-  const res = await fetch(`${API_V1}/members/me/telegram-link`, {
+  const res = await apiFetch(`${API_V1}/members/me/telegram-link`, {
     credentials: 'include',
   })
 
