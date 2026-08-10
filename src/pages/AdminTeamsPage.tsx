@@ -123,8 +123,10 @@ export default function AdminTeamsPage() {
                           const target = reassignTarget[m.memberId] ?? team.teamId
                           return (
                             <li key={m.memberId}>
-                              <span className="admin-member-name">{m.name}</span>
-                              <span className="admin-member-login">{m.loginId}</span>
+                              <div className="admin-member-info">
+                                <span className="admin-member-name">{m.name}</span>
+                                <span className="admin-member-login">{m.loginId}</span>
+                              </div>
                               <select
                                 className="admin-reassign-select"
                                 value={target}
