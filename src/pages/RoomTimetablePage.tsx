@@ -84,6 +84,7 @@ export default function RoomTimetablePage() {
   const [now, setNow] = useState(() => new Date())
 
   const trackRef = useRef<HTMLDivElement>(null)
+  const timelineRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState(false)
   const [draftRange, setDraftRange] = useState<DraftRange | null>(null)
   const [hoverSlot, setHoverSlot] = useState<number | null>(null)
@@ -207,7 +208,7 @@ export default function RoomTimetablePage() {
   }
 
   const offsetFromPointer = (clientY: number) => {
-    const rect = trackRef.current?.getBoundingClientRect()
+    const rect = timelineRef.current?.getBoundingClientRect()
     if (!rect) return 0
     const relY = clientY - rect.top
     const minutes = (relY / HOUR_HEIGHT) * 60
@@ -311,6 +312,16 @@ export default function RoomTimetablePage() {
     setSelectedIds((prev) =>
       prev.includes(memberId) ? prev.filter((id) => id !== memberId) : [...prev, memberId],
     )
+  }
+
+  const allSelected = roster.length > 0 && roster.every((m) => selectedIds.includes(m.memberId))
+
+  const toggleAllMembers = () => {
+    if (allSelected) {
+      setSelectedIds(myMemberId !== null ? [myMemberId] : [])
+    } else {
+      setSelectedIds(roster.map((m) => m.memberId))
+    }
   }
 
   const cancelDraft = () => {
@@ -461,7 +472,7 @@ export default function RoomTimetablePage() {
 
         {!loading && !error && (
           <>
-            <div className="timeline" style={{ height: TOTAL_HEIGHT }}>
+            <div ref={timelineRef} className="timeline" style={{ height: TOTAL_HEIGHT }}>
               {HOURS.map((h, i) => (
                 <div key={h} className="hour-row" style={{ top: i * HOUR_HEIGHT }}>
                   <span className="hour-label">{h}:00</span>
@@ -520,7 +531,7 @@ export default function RoomTimetablePage() {
                             <>
                               <button
                                 type="button"
-                                disabled={submittingThis}
+                                disabled={submittingThis || !!draftRange}
                                 onClick={() => openAdjust(entry)}
                               >
                                 조정
@@ -599,7 +610,7 @@ export default function RoomTimetablePage() {
                 </div>
               )}
 
-              {canDrag && (
+              {canDrag && adjustingId === null && (
                 <div
                   ref={trackRef}
                   className="drag-track"
@@ -645,7 +656,12 @@ export default function RoomTimetablePage() {
                 </>
               ) : (
                 <>
-                  <p className="confirm-label">참여 인원 (최소 {MIN_PARTICIPANTS}명, 본인 포함)</p>
+                  <div className="confirm-label-row">
+                    <p className="confirm-label">참여 인원 (최소 {MIN_PARTICIPANTS}명, 본인 포함)</p>
+                    <button type="button" className="select-all-button" onClick={toggleAllMembers}>
+                      {allSelected ? '전체 해제' : '전체 선택'}
+                    </button>
+                  </div>
                   <div className="member-grid">
                     {roster.map((m) => {
                       const isMe = m.memberId === myMemberId
