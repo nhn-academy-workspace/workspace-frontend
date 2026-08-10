@@ -313,6 +313,16 @@ export default function RoomTimetablePage() {
     )
   }
 
+  const allSelected = roster.length > 0 && roster.every((m) => selectedIds.includes(m.memberId))
+
+  const toggleAllMembers = () => {
+    if (allSelected) {
+      setSelectedIds(myMemberId !== null ? [myMemberId] : [])
+    } else {
+      setSelectedIds(roster.map((m) => m.memberId))
+    }
+  }
+
   const cancelDraft = () => {
     setDraftRange(null)
     setSubmitError(null)
@@ -645,7 +655,12 @@ export default function RoomTimetablePage() {
                 </>
               ) : (
                 <>
-                  <p className="confirm-label">참여 인원 (최소 {MIN_PARTICIPANTS}명, 본인 포함)</p>
+                  <div className="confirm-label-row">
+                    <p className="confirm-label">참여 인원 (최소 {MIN_PARTICIPANTS}명, 본인 포함)</p>
+                    <button type="button" className="select-all-button" onClick={toggleAllMembers}>
+                      {allSelected ? '전체 해제' : '전체 선택'}
+                    </button>
+                  </div>
                   <div className="member-grid">
                     {roster.map((m) => {
                       const isMe = m.memberId === myMemberId
