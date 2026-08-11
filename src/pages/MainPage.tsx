@@ -105,9 +105,9 @@ export default function MainPage() {
 
       <main className="main-content">
         <motion.div
-          initial={{ opacity: 0, y: reduceMotion ? 0 : 14 }}
+          initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: 'easeOut' }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
           <h1>환영합니다, {user?.name ?? '사용자'}님</h1>
           <p className="content-sub">지금 회의실 사용 현황을 확인하고 바로 예약해보세요.</p>
@@ -116,9 +116,9 @@ export default function MainPage() {
         {user?.role === 'STUDENT' && (
           <motion.article
             className="my-booking-banner"
-            initial={{ opacity: 0, y: reduceMotion ? 0 : 16 }}
+            initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.45, ease: 'easeOut' }}
+            transition={{ delay: 0.06, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
             onClick={() => navigate('/my-bookings')}
             role="button"
             tabIndex={0}
@@ -160,9 +160,9 @@ export default function MainPage() {
         {user?.role === 'TA' && (
           <motion.article
             className="my-booking-banner admin-banner"
-            initial={{ opacity: 0, y: reduceMotion ? 0 : 16 }}
+            initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.45, ease: 'easeOut' }}
+            transition={{ delay: 0.06, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
             onClick={() => navigate('/admin/teams')}
             role="button"
             tabIndex={0}
@@ -186,9 +186,9 @@ export default function MainPage() {
               <motion.article
                 key={room.id}
                 className={`room-card status-${room.status.toLowerCase()}`}
-                initial={{ opacity: 0, y: reduceMotion ? 0 : 20 }}
+                initial={{ opacity: 0, y: reduceMotion ? 0 : 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 + i * 0.1, duration: 0.45, ease: 'easeOut' }}
+                transition={{ delay: 0.1 + i * 0.05, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
                 whileHover={reduceMotion ? undefined : { y: -4 }}
                 onClick={() => navigate(`/rooms/${room.id}`)}
                 role="button"
