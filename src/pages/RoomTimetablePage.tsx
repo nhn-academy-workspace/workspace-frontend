@@ -103,6 +103,7 @@ export default function RoomTimetablePage() {
   const [adjustingId, setAdjustingId] = useState<number | null>(null)
   const [adjustRange, setAdjustRange] = useState<DraftRange | null>(null)
   const [resizingEdge, setResizingEdge] = useState<'start' | 'end' | null>(null)
+  const [tooltip, setTooltip] = useState<{ entry: TimetableEntry; x: number; y: number } | null>(null)
   const [lockReason, setLockReason] = useState('')
   const [deletingLockId, setDeletingLockId] = useState<number | null>(null)
 
@@ -324,6 +325,24 @@ export default function RoomTimetablePage() {
     }
   }
 
+  const handleTimelineMouseMove = (e: React.MouseEvent) => {
+    if (user?.role !== 'TA' || dragging || resizingEdge || draftRange) {
+      setTooltip(null)
+      return
+    }
+    const rect = timelineRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const relY = e.clientY - rect.top
+    const absoluteMinutes = (relY / HOUR_HEIGHT) * 60 + START_HOUR * 60
+    const hovered = entries.find(
+      (entry) =>
+        entry.type === 'BOOKING' &&
+        absoluteMinutes >= minutesOfDay(entry.startTime) &&
+        absoluteMinutes < minutesOfDay(entry.endTime),
+    )
+    setTooltip(hovered ? { entry: hovered, x: e.clientX, y: e.clientY } : null)
+  }
+
   const cancelDraft = () => {
     setDraftRange(null)
     setSubmitError(null)
@@ -472,7 +491,13 @@ export default function RoomTimetablePage() {
 
         {!loading && !error && (
           <>
-            <div ref={timelineRef} className="timeline" style={{ height: TOTAL_HEIGHT }}>
+            <div
+              ref={timelineRef}
+              className="timeline"
+              style={{ height: TOTAL_HEIGHT }}
+              onMouseMove={handleTimelineMouseMove}
+              onMouseLeave={() => setTooltip(null)}
+            >
               {HOURS.map((h, i) => (
                 <div key={h} className="hour-row" style={{ top: i * HOUR_HEIGHT }}>
                   <span className="hour-label">{h}:00</span>
@@ -505,7 +530,7 @@ export default function RoomTimetablePage() {
                   return (
                     <motion.div
                       key={`${entry.type}-${entry.id}`}
-                      className={`timeline-block entry-${entry.type.toLowerCase()}${isPast ? ' is-past' : ''}${isAdjustingThis ? ' is-adjusting' : ''}`}
+                      className={`timeline-block entry-${entry.type.toLowerCase()}${isPast ? ' is-past' : ''}${isAdjustingThis ? ' is-adjusting' : ''}${tooltip?.entry.id === entry.id ? ' is-hovered' : ''}`}
                       style={{ top, height }}
                       initial={{ opacity: 0, scaleY: reduceMotion ? 1 : 0.6 }}
                       animate={{ opacity: 1, scaleY: 1 }}
@@ -695,6 +720,25 @@ export default function RoomTimetablePage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {tooltip && (
+        <div
+          className="booking-tooltip"
+          style={{
+            left: `min(${tooltip.x + 14}px, calc(100vw - 210px))`,
+            top: `min(${tooltip.y - 12}px, calc(100vh - 110px))`,
+          }}
+        >
+          <p className="tooltip-room">{room?.name}</p>
+          <p className="tooltip-team">{tooltip.entry.teamName}</p>
+          <p className="tooltip-time">
+            {formatTime(tooltip.entry.startTime)} – {formatTime(tooltip.entry.endTime)}
+          </p>
+          {tooltip.entry.memberNames && tooltip.entry.memberNames.length > 0 && (
+            <p className="tooltip-members">{tooltip.entry.memberNames.join(' · ')}</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }

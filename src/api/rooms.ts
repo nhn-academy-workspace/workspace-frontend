@@ -1,3 +1,5 @@
+import { apiFetch } from './client'
+
 export type RoomStatus = 'AVAILABLE' | 'OCCUPIED' | 'LOCK'
 
 export interface Room {
@@ -15,9 +17,8 @@ export interface TimetableEntry {
   endTime: string
   teamName: string | null
   reason: string | null
+  memberNames: string[] | null
 }
-
-import { apiFetch } from './client'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 const API_V1 = `${API_BASE}/api/v1`
