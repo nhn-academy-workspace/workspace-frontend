@@ -249,6 +249,14 @@
   margin-top: 4px;
   flex-wrap: wrap;
   pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.timeline-block:hover .admin-block-actions,
+.timeline-block.is-hovered .admin-block-actions,
+.timeline-block.is-adjusting .admin-block-actions {
+  opacity: 1;
 }
 
 .admin-block-actions button {
@@ -528,6 +536,48 @@
   .confirm-panel-inner {
     padding: 16px 20px calc(16px + env(safe-area-inset-bottom, 0px));
   }
+}
+
+.booking-tooltip {
+  position: fixed;
+  z-index: 200;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+  min-width: 148px;
+}
+
+.tooltip-room {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 5px;
+}
+
+.tooltip-team {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 3px;
+}
+
+.tooltip-time {
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  margin: 0 0 6px;
+}
+
+.tooltip-members {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin: 0;
+  line-height: 1.5;
 }
 
 @media (prefers-color-scheme: dark) {
