@@ -1,3 +1,5 @@
+import { apiFetch } from './client'
+
 export type Role = 'STUDENT' | 'TA'
 
 export interface AuthUser {
@@ -12,6 +14,12 @@ export class PasswordChangeError extends Error {}
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 const API_V1 = `${API_BASE}/api/v1`
+
+export async function getMe(): Promise<AuthUser | null> {
+  const res = await fetch(`${API_V1}/auth/me`, { credentials: 'include' })
+  if (!res.ok) return null
+  return res.json()
+}
 
 export async function login(loginId: string, password: string): Promise<AuthUser> {
   const res = await fetch(`${API_V1}/auth/login`, {
@@ -39,7 +47,7 @@ export async function logout(): Promise<void> {
 }
 
 export async function changePassword(currentPassword: string, newPassword: string): Promise<boolean> {
-  const res = await fetch(`${API_V1}/auth/password`, {
+  const res = await apiFetch(`${API_V1}/auth/password`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
