@@ -22,6 +22,14 @@
   font-weight: 700;
   font-size: 15px;
   color: var(--ink);
+  text-decoration: none;
+  padding: 4px 6px;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.main-brand:hover {
+  background: var(--paper);
 }
 
 .main-user {

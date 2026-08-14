@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { getRooms, type Room } from '../api/rooms'
 import { getMyTeamBookingsToday, describeBookingTiming, formatMinutes, type MyBookingEntry } from '../api/myBooking'
@@ -85,14 +85,14 @@ export default function MainPage() {
   return (
     <div className="main-page">
       <header className="main-header">
-        <div className="main-brand">
+        <Link to="/main" className="main-brand">
           <svg width="26" height="26" viewBox="0 0 40 40" fill="none" aria-hidden="true">
             <rect x="2" y="6" width="15" height="28" rx="6" fill="var(--accent)" />
             <rect x="21" y="6" width="17" height="28" rx="6" fill="var(--accent)" opacity="0.45" />
             <circle cx="9.5" cy="20" r="3" fill="var(--accent-strong)" />
           </svg>
           <span>회의실 예약</span>
-        </div>
+        </Link>
         <div className="main-user">
           {user && (
             <button type="button" className="user-chip" onClick={() => navigate('/my-page')}>

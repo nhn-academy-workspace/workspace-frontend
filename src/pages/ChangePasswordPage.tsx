@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { changePassword, PasswordChangeError } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
@@ -55,6 +55,14 @@ export default function ChangePasswordPage() {
   return (
     <div className="change-password-page">
       <header className="change-password-header">
+        <Link to="/main" className="header-brand">
+          <svg width="26" height="26" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <rect x="2" y="6" width="15" height="28" rx="6" fill="var(--accent)" />
+            <rect x="21" y="6" width="17" height="28" rx="6" fill="var(--accent)" opacity="0.45" />
+            <circle cx="9.5" cy="20" r="3" fill="var(--accent-strong)" />
+          </svg>
+          <span>회의실 예약</span>
+        </Link>
         {!forced && (
           <button type="button" className="back-button" onClick={() => navigate(-1)}>
             ← 뒤로
