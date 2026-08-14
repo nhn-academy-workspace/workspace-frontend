@@ -1,0 +1,186 @@
+.game-page {
+  min-height: 100svh;
+  background: var(--paper);
+  display: flex;
+  flex-direction: column;
+}
+
+.game-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 32px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.game-back-btn {
+  border: none;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.game-back-btn:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.game-header h1 {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--ink);
+}
+
+.game-area {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 32px 20px;
+}
+
+.game-canvas-wrapper {
+  position: relative;
+  line-height: 0;
+}
+
+.game-canvas {
+  display: block;
+  border-radius: 14px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100svh - 120px);
+  aspect-ratio: 320 / 480;
+}
+
+/* ── Overlay ── */
+
+.game-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  pointer-events: none;
+}
+
+.game-card {
+  background: rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 18px;
+  padding: 26px 36px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.game-card-title {
+  font-size: 30px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 10px;
+  letter-spacing: -0.5px;
+}
+
+.game-card-hint {
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.75);
+  margin: 0;
+}
+
+/* ── Dead card ── */
+
+.dead-card {
+  pointer-events: auto;
+}
+
+.dead-over-label {
+  font-size: 20px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 0 4px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dead-score-display {
+  font-size: 60px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 22px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.dead-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.game-submit-btn {
+  border: none;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 15px;
+  font-weight: 700;
+  padding: 12px 28px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.game-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.game-retry-btn {
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 28px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.game-retry-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.game-submitted-msg {
+  font-size: 15px;
+  font-weight: 700;
+  color: #6DD420;
+  margin: 0;
+}
+
+.game-submit-error {
+  font-size: 13px;
+  color: #FF7878;
+  margin: 0;
+}
+
+@media (max-width: 400px) {
+  .game-header {
+    padding: 14px 20px;
+  }
+
+  .game-area {
+    padding: 20px 12px;
+  }
+}
