@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { createGameSession, submitScore, getTopScores, type ScoreEntry } from '../api/game'
+import {
+  createGameSession, submitScore,
+  getTopScores, getTodayTopScores, getPlayCountRanking, getTeamRanking,
+  type ScoreEntry, type PlayCountEntry, type TeamScoreEntry,
+} from '../api/game'
 import './DinoGamePage.css'
 
 // ── Canvas ──────────────────────────────────────────────────────────
@@ -25,7 +29,7 @@ const MAX_VY = 14
 // ── Speed ───────────────────────────────────────────────────────────
 const BASE_SPEED = 4
 const MAX_SPEED = 10
-const SPEED_RATE = 0.0004
+const SPEED_RATE = 0.001   // 빠른 가속: 이전의 2.5배
 
 // ── Score ───────────────────────────────────────────────────────────
 const SCORE_RATE = 0.1
@@ -68,10 +72,14 @@ function genPtero(): Ptero {
 
 function nextObsDelay(frame: number): number {
   const spd = getSpeed(frame)
-  // 픽셀 기준 최소 간격 보장: 초반 800px → 후반 500px까지만 줄어듦
-  // 실제 점프 커버 거리(~44프레임 * spd) 이상 확보
-  const minPx = Math.max(500, 900 - frame * 0.06)
-  const extraPx = 200 + Math.random() * 250
+  const minPx = Math.max(400, 840 - frame * 0.22)
+  // 3단 간격으로 불규칙성 극대화
+  const r = Math.random()
+  const extraPx = r < 0.30
+    ? 20 + Math.random() * 80    // 30% 짧은 버스트
+    : r < 0.75
+      ? 100 + Math.random() * 200  // 45% 보통
+      : 300 + Math.random() * 200  // 25% 긴 숨돌리기
   return (minPx + extraPx) / spd
 }
 
@@ -247,9 +255,15 @@ export default function DinoGamePage() {
   const [bestScore, setBestScore] = useState(() =>
     parseInt(localStorage.getItem('dino-best') || '0', 10),
   )
-  const [leaderboard, setLeaderboard] = useState<ScoreEntry[]>([])
-  const [lbLoading, setLbLoading] = useState(true)
   const [isNewBest, setIsNewBest] = useState(false)
+
+  type LbTab = 'all' | 'today' | 'playcount' | 'team'
+  const [lbTab, setLbTab] = useState<LbTab>('all')
+  const [allScores, setAllScores] = useState<ScoreEntry[]>([])
+  const [todayScores, setTodayScores] = useState<ScoreEntry[]>([])
+  const [playCounts, setPlayCounts] = useState<PlayCountEntry[]>([])
+  const [teamScores, setTeamScores] = useState<TeamScoreEntry[]>([])
+  const [lbLoading, setLbLoading] = useState(true)
 
   const [dark, setDark] = useState(() => {
     const t = document.documentElement.getAttribute('data-theme')
@@ -286,16 +300,25 @@ export default function DinoGamePage() {
   useEffect(() => { darkRef.current = dark }, [dark])
   const sessionIdRef = useRef<string>('')
 
-  const refreshLb = useCallback(() => {
-    getTopScores().then(setLeaderboard).catch(() => {})
+  const loadAllLb = useCallback(() => {
+    return Promise.all([
+      getTopScores(),
+      getTodayTopScores(),
+      getPlayCountRanking(),
+      getTeamRanking(),
+    ]).then(([all, today, plays, teams]) => {
+      setAllScores(all)
+      setTodayScores(today)
+      setPlayCounts(plays)
+      setTeamScores(teams)
+    }).catch(() => {})
   }, [])
 
+  const refreshLb = useCallback(() => { loadAllLb() }, [loadAllLb])
+
   useEffect(() => {
-    getTopScores()
-      .then(setLeaderboard)
-      .catch(() => setLeaderboard([]))
-      .finally(() => setLbLoading(false))
-  }, [])
+    loadAllLb().finally(() => setLbLoading(false))
+  }, [loadAllLb])
 
   const doStart = useCallback(() => {
     // 세션 발급 (비동기, 게임 시작은 즉시)
@@ -395,7 +418,9 @@ export default function DinoGamePage() {
         // spawn obstacles
         nextObsRef.current -= 1
         if (nextObsRef.current <= 0) {
-          const usePtero = spd > 5.5 && Math.random() < 0.32
+          // 속도 4.2부터 새 등장, 최대 55%까지 빠르게 비율 증가
+          const pteroRatio = Math.min(0.55, 0.15 + (spd - 4.2) * 0.13)
+          const usePtero = spd > 4.2 && Math.random() < pteroRatio
           obstaclesRef.current.push(usePtero ? genPtero() : genCactus())
           nextObsRef.current = nextObsDelay(f)
         }
@@ -542,29 +567,93 @@ export default function DinoGamePage() {
         </div>
 
         <aside className="dino-leaderboard">
-          <h2 className="dino-lb-title">🏆 전체 랭킹</h2>
+          <div className="dino-lb-tabs">
+            {([
+              ['all', '전체'],
+              ['today', '오늘'],
+              ['playcount', '플레이'],
+              ['team', '팀'],
+            ] as [LbTab, string][]).map(([key, label]) => (
+              <button
+                key={key}
+                className={`dino-lb-tab${lbTab === key ? ' active' : ''}`}
+                onClick={() => setLbTab(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
           {lbLoading ? (
             <p className="dino-lb-empty">불러오는 중…</p>
-          ) : leaderboard.length === 0 ? (
-            <p className="dino-lb-empty">아직 기록이 없어요</p>
+          ) : lbTab === 'all' ? (
+            allScores.length === 0 ? (
+              <p className="dino-lb-empty">아직 기록이 없어요</p>
+            ) : (
+              <ol className="dino-lb-list">
+                {allScores.map((e, i) => (
+                  <li key={i} className={`dino-lb-row${e.memberName === user?.name ? ' is-me' : ''}`}>
+                    <span className="dino-lb-rank">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}</span>
+                    <div className="dino-lb-info">
+                      <span className="dino-lb-name">{e.memberName}</span>
+                      <span className="dino-lb-team">{e.teamName}</span>
+                    </div>
+                    <span className="dino-lb-score">{e.score.toLocaleString()}</span>
+                  </li>
+                ))}
+              </ol>
+            )
+          ) : lbTab === 'today' ? (
+            todayScores.length === 0 ? (
+              <p className="dino-lb-empty">오늘 기록이 없어요</p>
+            ) : (
+              <ol className="dino-lb-list">
+                {todayScores.map((e, i) => (
+                  <li key={i} className={`dino-lb-row${e.memberName === user?.name ? ' is-me' : ''}`}>
+                    <span className="dino-lb-rank">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}</span>
+                    <div className="dino-lb-info">
+                      <span className="dino-lb-name">{e.memberName}</span>
+                      <span className="dino-lb-team">{e.teamName}</span>
+                    </div>
+                    <span className="dino-lb-score">{e.score.toLocaleString()}</span>
+                  </li>
+                ))}
+              </ol>
+            )
+          ) : lbTab === 'playcount' ? (
+            playCounts.length === 0 ? (
+              <p className="dino-lb-empty">아직 기록이 없어요</p>
+            ) : (
+              <ol className="dino-lb-list">
+                {playCounts.map((e, i) => (
+                  <li key={i} className={`dino-lb-row${e.memberName === user?.name ? ' is-me' : ''}`}>
+                    <span className="dino-lb-rank">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}</span>
+                    <div className="dino-lb-info">
+                      <span className="dino-lb-name">{e.memberName}</span>
+                      <span className="dino-lb-team">{e.teamName}</span>
+                    </div>
+                    <span className="dino-lb-score">{e.playCount.toLocaleString()}회</span>
+                  </li>
+                ))}
+              </ol>
+            )
           ) : (
-            <ol className="dino-lb-list">
-              {leaderboard.map((entry, i) => (
-                <li
-                  key={i}
-                  className={`dino-lb-row ${entry.memberName === user?.name ? 'is-me' : ''}`}
-                >
-                  <span className="dino-lb-rank">
-                    {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
-                  </span>
-                  <div className="dino-lb-info">
-                    <span className="dino-lb-name">{entry.memberName}</span>
-                    <span className="dino-lb-team">{entry.teamName}</span>
-                  </div>
-                  <span className="dino-lb-score">{entry.score.toLocaleString()}</span>
-                </li>
-              ))}
-            </ol>
+            teamScores.length === 0 ? (
+              <p className="dino-lb-empty">아직 기록이 없어요</p>
+            ) : (
+              <ol className="dino-lb-list">
+                {teamScores.map((e, i) => (
+                  <li key={i} className="dino-lb-row">
+                    <span className="dino-lb-rank">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}</span>
+                    <div className="dino-lb-info">
+                      <span className="dino-lb-name">{e.teamName}</span>
+                      <span className="dino-lb-team">팀 평균</span>
+                    </div>
+                    <span className="dino-lb-score">{Number(e.avgScore).toLocaleString()}</span>
+                  </li>
+                ))}
+              </ol>
+            )
           )}
         </aside>
       </main>

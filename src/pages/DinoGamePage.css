@@ -184,11 +184,39 @@
   flex-shrink: 0;
 }
 
-.dino-lb-title {
-  font-size: 15px;
-  font-weight: 700;
+.dino-lb-tabs {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 3px;
+}
+
+.dino-lb-tab {
+  flex: 1;
+  padding: 5px 2px;
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.dino-lb-tab.active {
+  background: var(--paper);
   color: var(--ink);
-  margin: 0 0 14px;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.dino-lb-tab:hover:not(.active) {
+  color: var(--ink);
 }
 
 .dino-lb-empty {
