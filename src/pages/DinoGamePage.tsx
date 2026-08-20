@@ -36,8 +36,19 @@ const STAGE_SPEEDS = [
   11.0, 12.0, 12.8, 13.5, 14.0,
 ]
 
+// ── Timing ──────────────────────────────────────────────────────────
+// 논리 시뮬레이션을 고정 스텝으로 돌려 주사율(60/75/144Hz)과 무관하게 만든다.
+// STEP_HZ가 실제 게임 속도를 정하는 유일한 기준값.
+const STEP_HZ = 75
+const STEP_MS = 1000 / STEP_HZ
+const MAX_STEPS = 5    // 랙 스파이크 시 따라잡기 폭주 방지
+const MAX_DT = 250     // 탭 비활성 복귀 등 큰 시간 갭은 버림
+
 // ── Score ───────────────────────────────────────────────────────────
-const SCORE_RATE = 0.1
+// 초당 적립 5.4점(LV.1) → 8.1점(LV.15). 서버 검증 상한(9점/초) 대비 10% 여유를
+// 플레이 시간과 무관하게 항상 확보 (누적 평균은 8.1을 넘지 못함)
+const SCORE_RATE = 0.072
+const SCORE_SPEED_BONUS = 0.2
 
 type GameState = 'idle' | 'playing' | 'dead'
 
@@ -314,6 +325,11 @@ export default function DinoGamePage() {
   useEffect(() => { darkRef.current = dark }, [dark])
   const sessionIdRef = useRef<string>('')
 
+  // 고정 스텝 루프용
+  const lastTimeRef = useRef(0)
+  const accRef = useRef(0)
+  const duckingRef = useRef(false)
+
   const loadAllLb = useCallback(() => {
     return Promise.all([
       getTopScores(),
@@ -350,6 +366,9 @@ export default function DinoGamePage() {
     gOffsetRef.current = 0
     nextObsRef.current = 90
     duckKeyRef.current = false
+    duckingRef.current = false
+    lastTimeRef.current = 0
+    accRef.current = 0
     setDisplayScore(0)
     setIsNewBest(false)
     setGameState('playing')
@@ -387,97 +406,99 @@ export default function DinoGamePage() {
         }
         return prev
       })
-      submitScore(sessionIdRef.current, sc).catch(() => {})
-      setTimeout(refreshLb, 700)
+      submitScore(sessionIdRef.current, sc)
+        .then(() => refreshLb())   // 저장 완료 직후 refresh
+        .catch(() => {})
+      setTimeout(refreshLb, 2500) // fallback: 네트워크 느릴 때 대비
     }
 
-    function loop() {
-      const isDark = darkRef.current
-      const state = gsRef.current
+    // ── 시뮬레이션 1스텝 (고정 1/STEP_HZ초). 충돌 시 true ──────────
+    function stepSim(): boolean {
+      const f = frameRef.current
+      const spd = getSpeed(f)
 
-      ctx.fillStyle = bg(isDark)
-      ctx.fillRect(0, 0, W, H)
+      gOffsetRef.current += spd
 
-      // clouds
       cloudsRef.current.forEach(c => {
-        drawCloud(ctx, c.x, c.y, isDark)
-        if (state === 'playing') c.x -= 0.55
+        c.x -= 0.55
         if (c.x < -60) c.x = W + 60
       })
 
+      // physics
+      dinoVYRef.current = Math.min(dinoVYRef.current + GRAVITY, MAX_VY)
+      dinoTopRef.current += dinoVYRef.current
+      if (dinoTopRef.current >= GROUND_Y - DINO_H) {
+        dinoTopRef.current = GROUND_Y - DINO_H
+        dinoVYRef.current = 0
+      }
+
+      // duck: snap to ground with reduced height
+      const onGround = dinoTopRef.current >= GROUND_Y - DINO_H - 1
+      const ducking = duckKeyRef.current && onGround
+      if (ducking) {
+        dinoTopRef.current = GROUND_Y - DINO_DUCK_H
+        dinoVYRef.current = 0
+      }
+      duckingRef.current = ducking
+
+      // spawn obstacles
+      nextObsRef.current -= 1
+      if (nextObsRef.current <= 0) {
+        // 속도 4.2부터 새 등장, 최대 55%까지 빠르게 비율 증가
+        const pteroRatio = Math.min(0.55, 0.15 + (spd - 4.2) * 0.13)
+        const usePtero = spd > 4.2 && Math.random() < pteroRatio
+        obstaclesRef.current.push(usePtero ? genPtero() : genCactus())
+        nextObsRef.current = nextObsDelay(f)
+      }
+
+      // dino hitbox
+      const dLeft = ducking ? DINO_X - 8 + 6 : DINO_X + 4
+      const dRight = ducking ? DINO_X - 8 + DINO_DUCK_W - 6 : DINO_X + DINO_W - 4
+      const dTop = ducking ? GROUND_Y - DINO_DUCK_H + 2 : dinoTopRef.current + 2
+      const dBottom = ducking ? GROUND_Y - 2 : dinoTopRef.current + DINO_HIT - 2
+
+      let hit = false
+      obstaclesRef.current = obstaclesRef.current.filter(obs => {
+        obs.x -= spd
+
+        if (obs.kind === 'cactus') {
+          const cLeft = obs.x + 4
+          const cRight = obs.x + obs.w - 4
+          const cTop = GROUND_Y - obs.h + 4
+          if (dLeft < cRight && dRight > cLeft && dBottom > cTop) hit = true
+        } else {
+          const pLeft = obs.x + 8
+          const pRight = obs.x + 46
+          const pTop = obs.y + 2
+          const pBottom = obs.y + 22
+          if (dLeft < pRight && dRight > pLeft && dTop < pBottom && dBottom > pTop) hit = true
+        }
+
+        return obs.x > -80
+      })
+
+      if (hit) return true
+
+      scoreRef.current += SCORE_RATE * (1 + (spd - STAGE_SPEEDS[0]) / STAGE_SPEEDS[0] * SCORE_SPEED_BONUS)
+      frameRef.current += 1
+      return false
+    }
+
+    // ── 렌더 (매 rAF 1회) ─────────────────────────────────────────
+    function render(isDark: boolean, wasPlaying: boolean, hit: boolean) {
+      ctx.fillStyle = bg(isDark)
+      ctx.fillRect(0, 0, W, H)
+
+      cloudsRef.current.forEach(c => drawCloud(ctx, c.x, c.y, isDark))
       drawGround(ctx, gOffsetRef.current, isDark)
 
-      if (state === 'playing') {
+      if (wasPlaying) {
         const f = frameRef.current
-        const spd = getSpeed(f)
-
-        gOffsetRef.current += spd
-
-        // physics
-        dinoVYRef.current = Math.min(dinoVYRef.current + GRAVITY, MAX_VY)
-        dinoTopRef.current += dinoVYRef.current
-        if (dinoTopRef.current >= GROUND_Y - DINO_H) {
-          dinoTopRef.current = GROUND_Y - DINO_H
-          dinoVYRef.current = 0
-        }
-
-        // duck: snap to ground with reduced height
-        const onGround = dinoTopRef.current >= GROUND_Y - DINO_H - 1
-        const ducking = duckKeyRef.current && onGround
-        if (ducking) {
-          dinoTopRef.current = GROUND_Y - DINO_DUCK_H
-          dinoVYRef.current = 0
-        }
-
-        // spawn obstacles
-        nextObsRef.current -= 1
-        if (nextObsRef.current <= 0) {
-          // 속도 4.2부터 새 등장, 최대 55%까지 빠르게 비율 증가
-          const pteroRatio = Math.min(0.55, 0.15 + (spd - 4.2) * 0.13)
-          const usePtero = spd > 4.2 && Math.random() < pteroRatio
-          obstaclesRef.current.push(usePtero ? genPtero() : genCactus())
-          nextObsRef.current = nextObsDelay(f)
-        }
-
-        // dino hitbox
-        const dLeft = ducking ? DINO_X - 8 + 6 : DINO_X + 4
-        const dRight = ducking ? DINO_X - 8 + DINO_DUCK_W - 6 : DINO_X + DINO_W - 4
-        const dTop = ducking ? GROUND_Y - DINO_DUCK_H + 2 : dinoTopRef.current + 2
-        const dBottom = ducking ? GROUND_Y - 2 : dinoTopRef.current + DINO_HIT - 2
-
-        let hit = false
-        obstaclesRef.current = obstaclesRef.current.filter(obs => {
-          obs.x -= spd
-
-          if (obs.kind === 'cactus') {
-            drawCactus(ctx, obs, isDark)
-            const cLeft = obs.x + 4
-            const cRight = obs.x + obs.w - 4
-            const cTop = GROUND_Y - obs.h + 4
-            if (dLeft < cRight && dRight > cLeft && dBottom > cTop) hit = true
-          } else {
-            drawPtero(ctx, obs, f, isDark)
-            const pLeft = obs.x + 8
-            const pRight = obs.x + 46
-            const pTop = obs.y + 2
-            const pBottom = obs.y + 22
-            if (dLeft < pRight && dRight > pLeft && dTop < pBottom && dBottom > pTop) hit = true
-          }
-
-          return obs.x > -80
+        obstaclesRef.current.forEach(obs => {
+          if (obs.kind === 'cactus') drawCactus(ctx, obs, isDark)
+          else drawPtero(ctx, obs, f, isDark)
         })
-
-        drawDino(ctx, dinoTopRef.current, ducking, f, hit, isDark)
-
-        if (hit) {
-          handleDeath(scoreRef.current)
-          raf = requestAnimationFrame(loop)
-          return
-        }
-
-        scoreRef.current += SCORE_RATE * (1 + (spd - STAGE_SPEEDS[0]) / STAGE_SPEEDS[0] * 0.25)
-        setDisplayScore(Math.floor(scoreRef.current))
-        frameRef.current += 1
+        drawDino(ctx, dinoTopRef.current, duckingRef.current, f, hit, isDark)
 
         // milestone flash every 100pts
         const sc = Math.floor(scoreRef.current)
@@ -490,13 +511,12 @@ export default function DinoGamePage() {
           ctx.fillStyle = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'
           ctx.fillRect(0, 0, W, H)
         }
-
       } else {
         // idle / dead: static dino
         const idleFrame = Math.floor(Date.now() / 80)
-        drawDino(ctx, GROUND_Y - DINO_H, false, idleFrame, state === 'dead', isDark)
+        drawDino(ctx, GROUND_Y - DINO_H, false, idleFrame, gsRef.current === 'dead', isDark)
 
-        if (state === 'idle') {
+        if (gsRef.current === 'idle') {
           ctx.fillStyle = isDark ? '#6b7280' : '#9ca3af'
           ctx.font = '14px system-ui, -apple-system, sans-serif'
           ctx.textAlign = 'center'
@@ -514,7 +534,41 @@ export default function DinoGamePage() {
       ctx.fillText(`LV.${getStage(frameRef.current)}`, 16, 28)
       ctx.textAlign = 'right'
       ctx.fillText(`HI ${hiScore}  ${curScore}`, W - 16, 28)
+    }
 
+    function loop(now: number) {
+      const isDark = darkRef.current
+      const wasPlaying = gsRef.current === 'playing'
+      let hit = false
+
+      if (wasPlaying) {
+        // 경과 실시간만큼 고정 스텝을 소비 → 주사율 무관
+        const prev = lastTimeRef.current
+        lastTimeRef.current = now
+        let dt = prev === 0 ? STEP_MS : now - prev
+        if (dt > MAX_DT) dt = STEP_MS
+        accRef.current += dt
+
+        let steps = 0
+        while (accRef.current >= STEP_MS && steps < MAX_STEPS) {
+          accRef.current -= STEP_MS
+          steps++
+          if (stepSim()) { hit = true; break }
+        }
+        if (steps >= MAX_STEPS) accRef.current = 0  // 밀린 시간은 버림
+
+        if (hit) {
+          accRef.current = 0
+          handleDeath(scoreRef.current)
+        } else {
+          setDisplayScore(Math.floor(scoreRef.current))
+        }
+      } else {
+        lastTimeRef.current = 0
+        accRef.current = 0
+      }
+
+      render(isDark, wasPlaying, hit)
       raf = requestAnimationFrame(loop)
     }
 
