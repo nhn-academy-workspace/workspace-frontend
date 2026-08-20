@@ -26,10 +26,15 @@ const GRAVITY = 0.65
 const JUMP_V = -14.5
 const MAX_VY = 14
 
-// ── Speed ───────────────────────────────────────────────────────────
-const BASE_SPEED = 4
-const MAX_SPEED = 10
-const SPEED_RATE = 0.001   // 빠른 가속: 이전의 2.5배
+// ── Speed (15단계) ──────────────────────────────────────────────────
+const STAGE_FRAMES = 600  // 단계당 프레임 (~10초 @ 60fps)
+const STAGE_COUNT = 15
+// 1~10단계: 기존 범위, 11~15단계: 하드 모드 (속도 10 이상)
+const STAGE_SPEEDS = [
+  4.0, 4.8, 5.5, 6.2, 6.9,
+  7.5, 8.0, 8.5, 9.0, 10.0,
+  11.0, 12.0, 12.8, 13.5, 14.0,
+]
 
 // ── Score ───────────────────────────────────────────────────────────
 const SCORE_RATE = 0.1
@@ -52,8 +57,16 @@ interface Ptero {
 
 type Obstacle = Cactus | Ptero
 
-function getSpeed(frame: number) {
-  return Math.min(BASE_SPEED + frame * SPEED_RATE, MAX_SPEED)
+function getStage(frame: number): number {
+  return Math.min(STAGE_COUNT, Math.floor(frame / STAGE_FRAMES) + 1)
+}
+
+function getSpeed(frame: number): number {
+  // 단계 사이를 선형 보간해 속도가 부드럽게 오름
+  const stageF = Math.min(frame / STAGE_FRAMES, STAGE_COUNT - 1)
+  const s = Math.floor(stageF)
+  const t = stageF - s
+  return STAGE_SPEEDS[s] + (STAGE_SPEEDS[Math.min(s + 1, STAGE_COUNT - 1)] - STAGE_SPEEDS[s]) * t
 }
 
 function genCactus(): Cactus {
@@ -72,14 +85,15 @@ function genPtero(): Ptero {
 
 function nextObsDelay(frame: number): number {
   const spd = getSpeed(frame)
-  const minPx = Math.max(400, 840 - frame * 0.22)
-  // 3단 간격으로 불규칙성 극대화
+  const minPx = Math.max(400, 850 - frame * 0.25)
+  // 후반부로 갈수록 extraPx 상한이 줄어 간격이 촘촘해짐 (최대 280 → 최소 80)
+  const extraMax = Math.max(80, 280 - frame * 0.09)
   const r = Math.random()
-  const extraPx = r < 0.30
-    ? 20 + Math.random() * 80    // 30% 짧은 버스트
-    : r < 0.75
-      ? 100 + Math.random() * 200  // 45% 보통
-      : 300 + Math.random() * 200  // 25% 긴 숨돌리기
+  const extraPx = r < 0.35
+    ? 30 + Math.random() * 60           // 35%: 빠른 연속
+    : r < 0.85
+      ? 70 + Math.random() * extraMax   // 50%: 보통 (후반엔 좁아짐)
+      : extraMax + Math.random() * 100  // 15%: 짧은 숨돌리기
   return (minPx + extraPx) / spd
 }
 
@@ -461,7 +475,7 @@ export default function DinoGamePage() {
           return
         }
 
-        scoreRef.current += SCORE_RATE * (1 + (spd - BASE_SPEED) / BASE_SPEED * 0.25)
+        scoreRef.current += SCORE_RATE * (1 + (spd - STAGE_SPEEDS[0]) / STAGE_SPEEDS[0] * 0.25)
         setDisplayScore(Math.floor(scoreRef.current))
         frameRef.current += 1
 
@@ -469,6 +483,11 @@ export default function DinoGamePage() {
         const sc = Math.floor(scoreRef.current)
         if (sc > 0 && sc % 100 < 2) {
           ctx.fillStyle = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'
+          ctx.fillRect(0, 0, W, H)
+        }
+        // 단계 전환 플래시
+        if (f > 0 && f % STAGE_FRAMES < 4) {
+          ctx.fillStyle = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'
           ctx.fillRect(0, 0, W, H)
         }
 
@@ -490,8 +509,10 @@ export default function DinoGamePage() {
       const curScore = String(Math.floor(scoreRef.current)).padStart(5, '0')
       const hiScore = String(parseInt(localStorage.getItem('dino-best') || '0')).padStart(5, '0')
       ctx.font = 'bold 16px ui-monospace, "Courier New", monospace'
-      ctx.textAlign = 'right'
       ctx.fillStyle = scoreColor
+      ctx.textAlign = 'left'
+      ctx.fillText(`LV.${getStage(frameRef.current)}`, 16, 28)
+      ctx.textAlign = 'right'
       ctx.fillText(`HI ${hiScore}  ${curScore}`, W - 16, 28)
 
       raf = requestAnimationFrame(loop)
