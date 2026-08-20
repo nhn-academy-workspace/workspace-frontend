@@ -23,9 +23,9 @@ const JUMP_V = -14.5
 const MAX_VY = 14
 
 // ── Speed ───────────────────────────────────────────────────────────
-const BASE_SPEED = 4.5
-const MAX_SPEED = 12
-const SPEED_RATE = 0.00065
+const BASE_SPEED = 4
+const MAX_SPEED = 10
+const SPEED_RATE = 0.0004
 
 // ── Score ───────────────────────────────────────────────────────────
 const SCORE_RATE = 0.1
@@ -68,9 +68,11 @@ function genPtero(): Ptero {
 
 function nextObsDelay(frame: number): number {
   const spd = getSpeed(frame)
-  const min = Math.max(55, 100 - frame * 0.04)
-  const range = Math.max(40, 80 - frame * 0.03)
-  return (min + Math.random() * range) / spd * 4.5
+  // 픽셀 기준 최소 간격 보장: 초반 800px → 후반 500px까지만 줄어듦
+  // 실제 점프 커버 거리(~44프레임 * spd) 이상 확보
+  const minPx = Math.max(500, 900 - frame * 0.06)
+  const extraPx = 200 + Math.random() * 250
+  return (minPx + extraPx) / spd
 }
 
 // ── Draw helpers ─────────────────────────────────────────────────────
@@ -386,7 +388,7 @@ export default function DinoGamePage() {
         // spawn obstacles
         nextObsRef.current -= 1
         if (nextObsRef.current <= 0) {
-          const usePtero = spd > 6.5 && Math.random() < 0.35
+          const usePtero = spd > 5.5 && Math.random() < 0.32
           obstaclesRef.current.push(usePtero ? genPtero() : genCactus())
           nextObsRef.current = nextObsDelay(f)
         }
@@ -450,6 +452,15 @@ export default function DinoGamePage() {
           ctx.fillText('스페이스바 또는 클릭하여 시작', W / 2, H / 2 + 14)
         }
       }
+
+      // ── canvas 우상단 스코어 ──────────────────────────────────
+      const scoreColor = isDark ? '#9ca3af' : '#6b7280'
+      const curScore = String(Math.floor(scoreRef.current)).padStart(5, '0')
+      const hiScore = String(parseInt(localStorage.getItem('dino-best') || '0')).padStart(5, '0')
+      ctx.font = 'bold 16px ui-monospace, "Courier New", monospace'
+      ctx.textAlign = 'right'
+      ctx.fillStyle = scoreColor
+      ctx.fillText(`HI ${hiScore}  ${curScore}`, W - 16, 28)
 
       raf = requestAnimationFrame(loop)
     }
