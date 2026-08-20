@@ -12,8 +12,10 @@ export interface AuthUser {
 export class LoginError extends Error {}
 export class PasswordChangeError extends Error {}
 export class PasswordResetError extends Error {
-  constructor(public status: number, message: string) {
+  status: number
+  constructor(status: number, message: string) {
     super(message)
+    this.status = status
   }
 }
 
