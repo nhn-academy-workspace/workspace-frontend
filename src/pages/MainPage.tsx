@@ -178,6 +178,25 @@ export default function MainPage() {
           </motion.article>
         )}
 
+        <motion.article
+          className="game-promo-banner"
+          initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          onClick={() => navigate('/game')}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter') navigate('/game') }}
+        >
+          <div className="game-promo-left">
+            <span className="banner-eyebrow">지금 바로 도전</span>
+            <h2>🦕 공룡 달리기</h2>
+            <p>회의실 예약 기다리는 동안 점수 내봐요. 랭킹 1위는 누구?</p>
+            <span className="banner-link">게임 시작하기 →</span>
+          </div>
+          <div className="game-promo-dino" aria-hidden="true">🏆</div>
+        </motion.article>
+
         {loading && <p className="state-message">불러오는 중...</p>}
         {error && <p className="state-message is-error">{error}</p>}
 
