@@ -258,3 +258,20 @@
     grid-template-columns: 1fr;
   }
 }
+
+.game-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 18px;
+  text-decoration: none;
+  transition: background 0.15s;
+  line-height: 1;
+}
+
+.game-nav-btn:hover {
+  background: var(--paper);
+}

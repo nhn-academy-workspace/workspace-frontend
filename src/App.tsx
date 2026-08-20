@@ -7,6 +7,7 @@ import BookingHistoryPage from './pages/BookingHistoryPage'
 import AdminTeamsPage from './pages/AdminTeamsPage'
 import ChangePasswordPage from './pages/ChangePasswordPage'
 import MyPage from './pages/MyPage'
+import DinoGamePage from './pages/DinoGamePage'
 import { RequireAuth } from './components/RequireAuth'
 
 function App() {
@@ -66,6 +67,14 @@ function App() {
         element={
           <RequireAuth>
             <MyPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/game"
+        element={
+          <RequireAuth>
+            <DinoGamePage />
           </RequireAuth>
         }
       />

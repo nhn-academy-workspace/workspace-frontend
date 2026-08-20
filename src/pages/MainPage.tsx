@@ -94,6 +94,7 @@ export default function MainPage() {
           <span>회의실 예약</span>
         </Link>
         <div className="main-user">
+          <Link to="/game" className="game-nav-btn" title="공룡 달리기">🦕</Link>
           {user && (
             <button type="button" className="user-chip" onClick={() => navigate('/my-page')}>
               <span className="role-badge">{roleLabel[user.role] ?? user.role}</span>
