@@ -36,6 +36,19 @@ export async function changeMemberTeam(memberId: number, teamId: number): Promis
   }
 }
 
+export async function resetMemberPassword(memberId: number): Promise<string> {
+  const res = await apiFetch(`${API_V1}/admin/members/${memberId}/password/reset`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.message ?? '비밀번호 초기화에 실패했습니다.')
+  }
+  const data: { tempPassword: string } = await res.json()
+  return data.tempPassword
+}
+
 export async function callTarget(
   targetType: 'MEMBER' | 'TEAM',
   targetId: number,

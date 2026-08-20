@@ -11,6 +11,11 @@ export interface AuthUser {
 
 export class LoginError extends Error {}
 export class PasswordChangeError extends Error {}
+export class PasswordResetError extends Error {
+  constructor(public status: number, message: string) {
+    super(message)
+  }
+}
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 const API_V1 = `${API_BASE}/api/v1`
@@ -44,6 +49,19 @@ export async function logout(): Promise<void> {
     method: 'POST',
     credentials: 'include',
   })
+}
+
+export async function resetPassword(loginId: string): Promise<void> {
+  const res = await fetch(`${API_V1}/auth/password/reset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ loginId }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new PasswordResetError(res.status, body?.message ?? '비밀번호 초기화에 실패했습니다.')
+  }
 }
 
 export async function changePassword(currentPassword: string, newPassword: string): Promise<boolean> {

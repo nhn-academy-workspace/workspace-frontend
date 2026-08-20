@@ -258,3 +258,90 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Game promo banner ───────────────────────────────────── */
+
+.game-promo-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  color: #fff;
+  border-radius: 20px;
+  padding: 24px 28px;
+  margin-bottom: 28px;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(22, 163, 74, 0.28);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  overflow: hidden;
+}
+
+.game-promo-banner::before {
+  content: '';
+  position: absolute;
+  top: -30px;
+  right: 70px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  pointer-events: none;
+}
+
+.game-promo-banner:hover {
+  box-shadow: 0 8px 28px rgba(22, 163, 74, 0.38);
+  transform: translateY(-2px);
+}
+
+.game-promo-banner:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.game-promo-banner .banner-eyebrow {
+  color: #bbf7d0;
+}
+
+.game-promo-banner h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: #fff;
+}
+
+.game-promo-banner p {
+  font-size: 14px;
+  opacity: 0.88;
+  margin: 0;
+  color: #fff;
+}
+
+.game-promo-left {
+  flex: 1;
+}
+
+.game-promo-dino {
+  font-size: 48px;
+  flex-shrink: 0;
+  margin-left: 16px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.18));
+}
+
+.game-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 18px;
+  text-decoration: none;
+  transition: background 0.15s;
+  line-height: 1;
+}
+
+.game-nav-btn:hover {
+  background: var(--paper);
+}
