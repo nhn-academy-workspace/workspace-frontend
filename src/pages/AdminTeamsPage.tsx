@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, useReducedMotion } from 'framer-motion'
-import { getAdminTeams, changeMemberTeam, callTarget, type AdminTeam } from '../api/admin'
+import { motion, useReducedMotion, AnimatePresence } from 'framer-motion'
+import { getAdminTeams, changeMemberTeam, callTarget, resetMemberPassword, type AdminTeam } from '../api/admin'
 import { useAuth } from '../context/AuthContext'
 import './AdminTeamsPage.css'
+
+interface ResetConfirmTarget {
+  memberId: number
+  name: string
+}
 
 export default function AdminTeamsPage() {
   const navigate = useNavigate()
@@ -20,6 +25,10 @@ export default function AdminTeamsPage() {
 
   const [calling, setCalling] = useState<string | null>(null)
   const [callError, setCallError] = useState<string | null>(null)
+
+  const [resetConfirm, setResetConfirm] = useState<ResetConfirmTarget | null>(null)
+  const [resetting, setResetting] = useState<number | null>(null)
+  const [resetResult, setResetResult] = useState<{ name: string; tempPassword: string } | null>(null)
 
   const fetchTeams = () => {
     setLoading(true)
@@ -65,6 +74,21 @@ export default function AdminTeamsPage() {
       setCallError(err instanceof Error ? err.message : '호출에 실패했습니다.')
     } finally {
       setCalling(null)
+    }
+  }
+
+  const handleResetConfirm = async () => {
+    if (!resetConfirm) return
+    const { memberId, name } = resetConfirm
+    setResetConfirm(null)
+    setResetting(memberId)
+    try {
+      const tempPassword = await resetMemberPassword(memberId)
+      setResetResult({ name, tempPassword })
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : '비밀번호 초기화에 실패했습니다.')
+    } finally {
+      setResetting(null)
     }
   }
 
@@ -157,6 +181,14 @@ export default function AdminTeamsPage() {
                               >
                                 호출
                               </button>
+                              <button
+                                type="button"
+                                className="admin-reset-pw-button"
+                                disabled={resetting === m.memberId}
+                                onClick={() => setResetConfirm({ memberId: m.memberId, name: m.name })}
+                              >
+                                {resetting === m.memberId ? '초기화 중...' : 'PW 초기화'}
+                              </button>
                             </li>
                           )
                         })}
@@ -169,6 +201,75 @@ export default function AdminTeamsPage() {
           </>
         )}
       </main>
+
+      {/* 비밀번호 초기화 확인 모달 */}
+      <AnimatePresence>
+        {resetConfirm && (
+          <motion.div
+            className="admin-modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            onClick={(e) => { if (e.target === e.currentTarget) setResetConfirm(null) }}
+          >
+            <motion.div
+              className="admin-modal"
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+            >
+              <div className="admin-modal-icon">🔑</div>
+              <h3 className="admin-modal-title">비밀번호 초기화</h3>
+              <p className="admin-modal-body">
+                <strong>{resetConfirm.name}</strong> 학생의 비밀번호를 초기화하시겠습니까?
+              </p>
+              <p className="admin-modal-sub">
+                초기화된 임시 비밀번호가 화면에 표시됩니다. 학생에게 직접 전달해주세요.
+              </p>
+              <div className="admin-modal-actions">
+                <button type="button" className="admin-modal-cancel" onClick={() => setResetConfirm(null)}>취소</button>
+                <button type="button" className="admin-modal-confirm" onClick={handleResetConfirm}>초기화</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 초기화 결과 모달 */}
+      <AnimatePresence>
+        {resetResult && (
+          <motion.div
+            className="admin-modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
+            <motion.div
+              className="admin-modal"
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+            >
+              <div className="admin-modal-icon success">✓</div>
+              <h3 className="admin-modal-title">초기화 완료</h3>
+              <p className="admin-modal-body">
+                <strong>{resetResult.name}</strong> 학생의 임시 비밀번호입니다.
+              </p>
+              <div className="admin-temp-password">{resetResult.tempPassword}</div>
+              <p className="admin-modal-sub">
+                학생에게 직접 전달하고, 화면을 닫은 후 비밀번호를 변경하도록 안내하세요.
+              </p>
+              <div className="admin-modal-actions">
+                <button type="button" className="admin-modal-confirm" onClick={() => setResetResult(null)}>확인</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

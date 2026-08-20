@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion, AnimatePresence } from 'framer-motion'
-import { login, LoginError } from '../api/auth'
+import { login, LoginError, resetPassword, PasswordResetError } from '../api/auth'
 import { getRooms, type Room } from '../api/rooms'
 import { useAuth } from '../context/AuthContext'
 import './LoginPage.css'
@@ -65,12 +65,16 @@ function RoomPreview() {
   )
 }
 
+type ResetStep = 'idle' | 'confirm' | 'loading' | 'success' | 'no-telegram' | 'error'
+
 export default function LoginPage() {
   const [loginId, setLoginId] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [failCount, setFailCount] = useState(0)
+  const [resetStep, setResetStep] = useState<ResetStep>('idle')
 
   const { setUser } = useAuth()
   const navigate = useNavigate()
@@ -90,10 +94,35 @@ export default function LoginPage() {
       navigate(user.mustChangePassword ? '/change-password' : '/main', { replace: true })
     } catch (err) {
       setError(err instanceof LoginError ? err.message : '알 수 없는 오류가 발생했습니다.')
+      setFailCount((c) => c + 1)
     } finally {
       setSubmitting(false)
     }
   }
+
+  const openResetConfirm = () => {
+    if (!loginId.trim()) {
+      setError('아이디를 먼저 입력해주세요.')
+      return
+    }
+    setResetStep('confirm')
+  }
+
+  const handleResetConfirm = async () => {
+    setResetStep('loading')
+    try {
+      await resetPassword(loginId)
+      setResetStep('success')
+    } catch (err) {
+      if (err instanceof PasswordResetError && err.status === 422) {
+        setResetStep('no-telegram')
+      } else {
+        setResetStep('error')
+      }
+    }
+  }
+
+  const closeReset = () => setResetStep('idle')
 
   return (
     <div className="login-page">
@@ -201,6 +230,26 @@ export default function LoginPage() {
             )}
           </AnimatePresence>
 
+          <AnimatePresence>
+            {failCount >= 1 && (
+              <motion.div
+                className="reset-hint"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+              >
+                <button
+                  type="button"
+                  className="reset-password-link"
+                  onClick={openResetConfirm}
+                >
+                  비밀번호를 잊으셨나요?
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <motion.button
             type="submit"
             className="submit-button"
@@ -219,6 +268,97 @@ export default function LoginPage() {
           </motion.p>
         </motion.form>
       </section>
+
+      <AnimatePresence>
+        {resetStep !== 'idle' && (
+          <motion.div
+            className="reset-modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={(e) => { if (e.target === e.currentTarget) closeReset() }}
+          >
+            <motion.div
+              className="reset-modal"
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+            >
+              {resetStep === 'confirm' && (
+                <>
+                  <div className="reset-modal-icon">🔑</div>
+                  <h3 className="reset-modal-title">비밀번호 초기화</h3>
+                  <p className="reset-modal-body">
+                    <strong>{loginId}</strong> 계정의 비밀번호를 초기화하시겠습니까?
+                  </p>
+                  <p className="reset-modal-sub">
+                    초기화된 임시 비밀번호는 연동된 텔레그램으로 발송됩니다.
+                  </p>
+                  <div className="reset-modal-actions">
+                    <button type="button" className="reset-modal-cancel" onClick={closeReset}>취소</button>
+                    <button type="button" className="reset-modal-confirm" onClick={handleResetConfirm}>초기화</button>
+                  </div>
+                </>
+              )}
+
+              {resetStep === 'loading' && (
+                <div className="reset-modal-loading">
+                  <span className="spinner reset-spinner" aria-hidden="true" />
+                  <p className="reset-modal-body">처리 중...</p>
+                </div>
+              )}
+
+              {resetStep === 'success' && (
+                <>
+                  <div className="reset-modal-icon success">✓</div>
+                  <h3 className="reset-modal-title">전송 완료</h3>
+                  <p className="reset-modal-body">
+                    텔레그램으로 임시 비밀번호가 전송되었습니다.
+                  </p>
+                  <p className="reset-modal-sub">
+                    임시 비밀번호로 로그인 후 새 비밀번호로 변경해주세요.
+                  </p>
+                  <div className="reset-modal-actions">
+                    <button type="button" className="reset-modal-confirm" onClick={closeReset}>확인</button>
+                  </div>
+                </>
+              )}
+
+              {resetStep === 'no-telegram' && (
+                <>
+                  <div className="reset-modal-icon warning">!</div>
+                  <h3 className="reset-modal-title">텔레그램 미연동</h3>
+                  <p className="reset-modal-body">
+                    텔레그램이 연동되어 있지 않아 임시 비밀번호를 전송할 수 없습니다.
+                  </p>
+                  <p className="reset-modal-sub">
+                    담당 TA에게 직접 문의하여 비밀번호를 초기화받으세요.
+                  </p>
+                  <div className="reset-modal-actions">
+                    <button type="button" className="reset-modal-confirm" onClick={closeReset}>확인</button>
+                  </div>
+                </>
+              )}
+
+              {resetStep === 'error' && (
+                <>
+                  <div className="reset-modal-icon warning">!</div>
+                  <h3 className="reset-modal-title">초기화 실패</h3>
+                  <p className="reset-modal-body">
+                    아이디를 확인하거나 담당 TA에게 문의하세요.
+                  </p>
+                  <div className="reset-modal-actions">
+                    <button type="button" className="reset-modal-cancel" onClick={() => setResetStep('confirm')}>다시 시도</button>
+                    <button type="button" className="reset-modal-confirm" onClick={closeReset}>닫기</button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
