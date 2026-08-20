@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { submitScore, getTopScores, type ScoreEntry } from '../api/game'
+import { createGameSession, submitScore, getTopScores, type ScoreEntry } from '../api/game'
 import './DinoGamePage.css'
 
 // ── Canvas ──────────────────────────────────────────────────────────
@@ -284,6 +284,7 @@ export default function DinoGamePage() {
   ])
   const darkRef = useRef(dark)
   useEffect(() => { darkRef.current = dark }, [dark])
+  const sessionIdRef = useRef<string>('')
 
   const refreshLb = useCallback(() => {
     getTopScores().then(setLeaderboard).catch(() => {})
@@ -297,6 +298,12 @@ export default function DinoGamePage() {
   }, [])
 
   const doStart = useCallback(() => {
+    // 세션 발급 (비동기, 게임 시작은 즉시)
+    sessionIdRef.current = ''
+    createGameSession()
+      .then(sid => { sessionIdRef.current = sid })
+      .catch(() => {})
+
     gsRef.current = 'playing'
     dinoTopRef.current = GROUND_Y - DINO_H
     dinoVYRef.current = JUMP_V
@@ -343,7 +350,7 @@ export default function DinoGamePage() {
         }
         return prev
       })
-      submitScore(sc).catch(() => {})
+      submitScore(sessionIdRef.current, sc).catch(() => {})
       setTimeout(refreshLb, 700)
     }
 
