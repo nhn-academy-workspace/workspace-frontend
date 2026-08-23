@@ -7,6 +7,8 @@ export interface AuthUser {
   role: Role
   teamName: string | null
   mustChangePassword: boolean
+  telegramLinked: boolean
+  telegramLinkSkipped: boolean
 }
 
 export class LoginError extends Error {}
