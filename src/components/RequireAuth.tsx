@@ -14,5 +14,13 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   if (user.mustChangePassword && location.pathname !== '/change-password') {
     return <Navigate to="/change-password" replace />
   }
+  if (
+    !user.telegramLinked &&
+    !user.telegramLinkSkipped &&
+    location.pathname !== '/my-page' &&
+    location.pathname !== '/change-password'
+  ) {
+    return <Navigate to="/my-page" replace />
+  }
   return <>{children}</>
 }

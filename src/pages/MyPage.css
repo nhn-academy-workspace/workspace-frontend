@@ -158,6 +158,17 @@
   cursor: not-allowed;
 }
 
+.my-skip-button {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 13px;
+  padding: 8px 0 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .my-nav-item {
   display: flex;
   align-items: center;

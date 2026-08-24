@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
-import { getTelegramLinkStatus, requestTelegramLink } from '../api/notifications'
+import { getTelegramLinkStatus, requestTelegramLink, skipTelegramLink } from '../api/notifications'
 import './MyPage.css'
 
 const roleLabel: Record<string, string> = {
@@ -11,19 +11,25 @@ const roleLabel: Record<string, string> = {
 }
 
 export default function MyPage() {
-  const { user, logout } = useAuth()
+  const { user, setUser, logout } = useAuth()
   const navigate = useNavigate()
   const reduceMotion = useReducedMotion()
 
   const [telegramLinking, setTelegramLinking] = useState(false)
   const [telegramLinkError, setTelegramLinkError] = useState<string | null>(null)
-  const [telegramLinked, setTelegramLinked] = useState(false)
+  const [telegramLinked, setTelegramLinked] = useState(user?.telegramLinked ?? false)
 
   useEffect(() => {
     let cancelled = false
     const checkStatus = () => {
       getTelegramLinkStatus().then((linked) => {
-        if (!cancelled) setTelegramLinked(linked)
+        if (cancelled) return
+        setTelegramLinked(linked)
+        // 다른 페이지의 RequireAuth가 참조하는 값도 최신 상태로 맞춰줘야
+        // 여기서 연동하고 나갔을 때 다시 여기로 튕기지 않음
+        if (user && linked !== user.telegramLinked) {
+          setUser({ ...user, telegramLinked: linked })
+        }
       })
     }
     checkStatus()
@@ -32,7 +38,20 @@ export default function MyPage() {
       cancelled = true
       window.removeEventListener('focus', checkStatus)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const handleSkipTelegramLink = async () => {
+    try {
+      await skipTelegramLink()
+    } catch {
+      // 서버 반영 실패해도 이번 세션 흐름은 막지 않음 — 다음 로그인 때 다시 물어보게 됨
+    }
+    if (user) {
+      setUser({ ...user, telegramLinkSkipped: true })
+    }
+    navigate('/main', { replace: true })
+  }
 
   const handleTelegramLink = async () => {
     setTelegramLinking(true)
@@ -102,6 +121,11 @@ export default function MyPage() {
                 >
                   {telegramLinking ? '연동 중...' : '텔레그램 연동하기'}
                 </button>
+                {!user?.telegramLinked && (
+                  <button type="button" className="my-skip-button" onClick={handleSkipTelegramLink}>
+                    텔레그램이 없어요, 나중에 할게요
+                  </button>
+                )}
               </>
             )}
           </section>

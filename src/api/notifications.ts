@@ -20,6 +20,17 @@ export async function requestTelegramLink(): Promise<string> {
   return data.deepLink
 }
 
+export async function skipTelegramLink(): Promise<void> {
+  const res = await apiFetch(`${API_V1}/members/me/telegram-link/skip`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+
+  if (!res.ok) {
+    throw new TelegramLinkError('요청 처리에 실패했습니다.')
+  }
+}
+
 export async function getTelegramLinkStatus(): Promise<boolean> {
   const res = await apiFetch(`${API_V1}/members/me/telegram-link`, {
     credentials: 'include',
