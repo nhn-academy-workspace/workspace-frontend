@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
-  createGameSession, submitScore,
+  createGameSession, submitScore, sendBeat,
   getTopScores, getTodayTopScores, getPlayCountRanking, getTeamRanking,
   type ScoreEntry, type PlayCountEntry, type TeamScoreEntry,
 } from '../api/game'
@@ -27,7 +27,7 @@ const JUMP_V = -14.5
 const MAX_VY = 14
 
 // ── Speed (15단계) ──────────────────────────────────────────────────
-const STAGE_FRAMES = 600  // 단계당 프레임 (~10초 @ 60fps)
+const STAGE_FRAMES = 600  // 단계당 스텝 (STEP_HZ=75 기준 8초, 15단계 = 120초)
 const STAGE_COUNT = 15
 // 1~10단계: 기존 범위, 11~15단계: 하드 모드 (속도 10 이상)
 const STAGE_SPEEDS = [
@@ -41,7 +41,9 @@ const STAGE_SPEEDS = [
 // STEP_HZ가 실제 게임 속도를 정하는 유일한 기준값.
 const STEP_HZ = 75
 const STEP_MS = 1000 / STEP_HZ
-const MAX_STEPS = 5    // 랙 스파이크 시 따라잡기 폭주 방지
+// 랙 스파이크 시 따라잡기 폭주 방지. 저사양 기기에서 게임이 실시간보다 뒤처지면
+// 서버의 점수 하한 검증에 걸리므로, 10fps까지는 따라잡을 수 있게 여유를 둔다.
+const MAX_STEPS = 8
 const MAX_DT = 250     // 탭 비활성 복귀 등 큰 시간 갭은 버림
 
 // ── Score ───────────────────────────────────────────────────────────
@@ -281,6 +283,8 @@ export default function DinoGamePage() {
     parseInt(localStorage.getItem('dino-best') || '0', 10),
   )
   const [isNewBest, setIsNewBest] = useState(false)
+  // 기록 저장 상태 — 세션이 무효화되면 저장되지 않음을 알려야 한다
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle')
 
   type LbTab = 'all' | 'today' | 'playcount' | 'team'
   const [lbTab, setLbTab] = useState<LbTab>('all')
@@ -330,6 +334,11 @@ export default function DinoGamePage() {
   const accRef = useRef(0)
   const duckingRef = useRef(false)
 
+  // 하트비트용
+  const beatIntervalRef = useRef(5000)
+  const beatAccRef = useRef(0)
+  const sessionInvalidRef = useRef(false)
+
   const loadAllLb = useCallback(() => {
     return Promise.all([
       getTopScores(),
@@ -353,10 +362,16 @@ export default function DinoGamePage() {
   const doStart = useCallback(() => {
     // 세션 발급 (비동기, 게임 시작은 즉시)
     sessionIdRef.current = ''
+    sessionInvalidRef.current = false
+    beatAccRef.current = 0
     createGameSession()
-      .then(sid => { sessionIdRef.current = sid })
-      .catch(() => {})
+      .then(s => {
+        sessionIdRef.current = s.sessionId
+        beatIntervalRef.current = s.beatIntervalMs
+      })
+      .catch(() => { sessionInvalidRef.current = true })
 
+    setSaveState('idle')
     gsRef.current = 'playing'
     dinoTopRef.current = GROUND_Y - DINO_H
     dinoVYRef.current = JUMP_V
@@ -406,10 +421,19 @@ export default function DinoGamePage() {
         }
         return prev
       })
+      // 세션이 무효화됐으면 제출해봐야 반려되므로 시도하지 않는다
+      if (!sessionIdRef.current || sessionInvalidRef.current) {
+        setSaveState('failed')
+        return
+      }
+
+      setSaveState('saving')
       submitScore(sessionIdRef.current, sc)
-        .then(() => refreshLb())   // 저장 완료 직후 refresh
-        .catch(() => {})
-      setTimeout(refreshLb, 2500) // fallback: 네트워크 느릴 때 대비
+        .then(() => {
+          setSaveState('saved')
+          refreshLb()            // 저장 완료 직후 refresh
+        })
+        .catch(() => setSaveState('failed'))
     }
 
     // ── 시뮬레이션 1스텝 (고정 1/STEP_HZ초). 충돌 시 true ──────────
@@ -562,6 +586,17 @@ export default function DinoGamePage() {
           handleDeath(scoreRef.current)
         } else {
           setDisplayScore(Math.floor(scoreRef.current))
+
+          // 하트비트: 시뮬레이션이 실제로 진행된 만큼만 누적한다.
+          // 게임이 멈추면 beat도 멈추므로 "살아서 플레이 중"이라는 신호가 된다.
+          if (sessionIdRef.current && !sessionInvalidRef.current) {
+            beatAccRef.current += steps * STEP_MS
+            if (beatAccRef.current >= beatIntervalRef.current) {
+              beatAccRef.current = 0
+              sendBeat(sessionIdRef.current, Math.floor(scoreRef.current))
+                .catch(() => { sessionInvalidRef.current = true })
+            }
+          }
         }
       } else {
         lastTimeRef.current = 0
@@ -572,8 +607,20 @@ export default function DinoGamePage() {
       raf = requestAnimationFrame(loop)
     }
 
+    // 탭을 벗어나면 rAF가 멈춰 하트비트도 끊긴다. 조용히 세션이 무효화되면
+    // 사용자에겐 원인 불명의 기록 소실로 보이므로, 명시적으로 라운드를 끝낸다.
+    function onVisibilityChange() {
+      if (document.hidden && gsRef.current === 'playing') {
+        handleDeath(scoreRef.current)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
     raf = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(raf)
+    return () => {
+      cancelAnimationFrame(raf)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [dark, refreshLb])
 
   // keyboard controls
@@ -629,6 +676,12 @@ export default function DinoGamePage() {
                 <p className="dino-game-over">게임 오버</p>
                 {isNewBest && <p className="dino-new-best">🎉 신기록!</p>}
                 <p className="dino-final-score">점수: {displayScore.toLocaleString()}</p>
+                {saveState === 'failed' && (
+                  <p className="dino-save-failed">
+                    기록이 저장되지 않았어요
+                    <span>플레이 도중 연결이 끊겼거나 탭을 벗어났어요</span>
+                  </p>
+                )}
                 <button className="dino-restart-btn" onClick={doStart}>
                   다시 시작
                 </button>

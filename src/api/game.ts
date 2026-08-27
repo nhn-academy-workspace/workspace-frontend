@@ -17,11 +17,30 @@ export interface TeamScoreEntry {
   avgScore: number
 }
 
-export async function createGameSession(): Promise<string> {
+export interface GameSession {
+  sessionId: string
+  /** 서버가 지정한 하트비트 주기(ms). 이 간격을 지키지 않으면 세션이 무효화된다. */
+  beatIntervalMs: number
+}
+
+export async function createGameSession(): Promise<GameSession> {
   const res = await apiFetch('/api/v1/game/sessions', { method: 'POST' })
   if (!res.ok) throw new Error('session create failed')
   const data = await res.json()
-  return data.sessionId as string
+  return {
+    sessionId: data.sessionId as string,
+    beatIntervalMs: (data.beatIntervalMs as number) ?? 5000,
+  }
+}
+
+/** 플레이 중 진행 상황 보고. 실패하면 세션이 무효화된 것이므로 제출을 포기해야 한다. */
+export async function sendBeat(sessionId: string, score: number): Promise<void> {
+  const res = await apiFetch(`/api/v1/game/sessions/${sessionId}/beat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ score }),
+  })
+  if (!res.ok) throw new Error('beat rejected')
 }
 
 export async function submitScore(sessionId: string, score: number): Promise<void> {
