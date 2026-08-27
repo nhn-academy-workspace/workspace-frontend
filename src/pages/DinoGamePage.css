@@ -153,6 +153,22 @@
   margin: 0 0 16px;
 }
 
+.dino-save-failed {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--busy, #dc2626);
+  margin: -8px 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dino-save-failed span {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
 .dino-restart-btn {
   display: inline-block;
   padding: 9px 22px;
