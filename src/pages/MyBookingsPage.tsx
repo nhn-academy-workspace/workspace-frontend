@@ -13,7 +13,8 @@ import './MyBookingsPage.css'
 const CLOSE_MINUTES = 18 * 60
 const DAILY_CAP_MINUTES = 240
 const EXTEND_WINDOW = 15
-const DURATION_OPTIONS = [15, 30, 45, 60]
+const EXTEND_STEP = 5 // 백엔드 연장 최소 단위와 일치
+const DURATION_OPTIONS = [5, 10, 15, 30, 45, 60]
 
 function formatTime(iso: string): string {
   return iso.slice(11, 16)
@@ -130,7 +131,7 @@ export default function MyBookingsPage() {
       maxEndAbs = Math.min(maxEndAbs, entryEnd + capRemaining)
 
       const rawMax = maxEndAbs - entryEnd
-      setExtendMax(Math.max(Math.floor(rawMax / 15) * 15, 0))
+      setExtendMax(Math.max(Math.floor(rawMax / EXTEND_STEP) * EXTEND_STEP, 0))
     } catch {
       setExtendMax(0)
     } finally {
@@ -305,12 +306,12 @@ export default function MyBookingsPage() {
                             transition={{ duration: 0.2, ease: 'easeOut' }}
                           >
                             {extendLoading && <span className="extend-hint">확인 중...</span>}
-                            {!extendLoading && extendMax !== null && extendMax < 15 && (
+                            {!extendLoading && extendMax !== null && extendMax < EXTEND_STEP && (
                               <span className="extend-hint">지금은 더 연장할 수 있는 시간이 없어요.</span>
                             )}
                             {!extendLoading &&
                               extendMax !== null &&
-                              extendMax >= 15 &&
+                              extendMax >= EXTEND_STEP &&
                               DURATION_OPTIONS.map((m) => (
                                 <button
                                   key={m}
