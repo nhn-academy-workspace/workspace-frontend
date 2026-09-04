@@ -64,6 +64,16 @@ export async function createLock(payload: CreateLockPayload): Promise<LockResult
   return handle(res, '락 생성에 실패했습니다.')
 }
 
+export async function updateLock(lockId: number, payload: CreateLockPayload): Promise<LockResult> {
+  const res = await apiFetch(`${API_V1}/admin/room-locks/${lockId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  })
+  return handle(res, '락 조정에 실패했습니다.')
+}
+
 export async function deleteLock(lockId: number): Promise<void> {
   const res = await apiFetch(`${API_V1}/admin/room-locks/${lockId}`, {
     method: 'DELETE',
