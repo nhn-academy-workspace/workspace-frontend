@@ -41,15 +41,15 @@
 .timetable-content {
   max-width: 520px;
   margin: 0 auto;
-  padding: 40px 32px 64px;
+  padding: 28px 32px 64px;
 }
 
 .date-nav {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  margin-bottom: 20px;
+  gap: 14px;
+  margin-bottom: 16px;
 }
 
 .date-nav button {
@@ -70,11 +70,30 @@
 }
 
 .date-label {
+  position: relative;
   font-size: 16px;
   font-weight: 700;
   color: var(--ink);
-  min-width: 140px;
+  min-width: 150px;
   text-align: center;
+  padding: 6px 4px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.date-label:hover {
+  background: var(--accent-soft);
+}
+
+/* 라벨을 누르면 네이티브 날짜 선택기가 열리도록 입력을 라벨 위에 투명하게 덮는다 */
+.date-label input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: 0;
+  cursor: pointer;
 }
 
 .current-caption {
@@ -82,14 +101,33 @@
   font-size: 14px;
   font-weight: 700;
   color: var(--accent-strong);
-  margin: 0 0 28px;
+  margin: 0 0 16px;
 }
 
 .drag-hint {
   text-align: center;
   font-size: 12.5px;
   color: var(--ink-faint);
-  margin: 0 0 20px;
+  margin: 8px 0 18px;
+}
+
+.add-cta {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 14.5px;
+  font-weight: 700;
+  padding: 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.add-cta:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 
 .state-message {
@@ -113,7 +151,11 @@
 
 .timeline {
   position: relative;
-  padding-bottom: 24px;
+  margin-top: 4px;
+}
+
+.timeline.is-tappable {
+  cursor: pointer;
 }
 
 .hour-row {
@@ -124,6 +166,7 @@
   align-items: center;
   gap: 10px;
   transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .hour-label {
@@ -148,6 +191,7 @@
   height: 1px;
   background: var(--line);
   opacity: 0.4;
+  pointer-events: none;
 }
 
 .timeline-blocks {
@@ -156,28 +200,6 @@
   bottom: 0;
   left: 56px;
   right: 0;
-}
-
-.hover-slot {
-  position: absolute;
-  left: 56px;
-  right: 0;
-  background: var(--accent-soft);
-  border-radius: 6px;
-  pointer-events: none;
-}
-
-.drag-track {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 56px;
-  right: 0;
-  z-index: 8;
-  cursor: crosshair;
-  /* 겹치는/지난 슬롯 위에서는 드래그가 시작되지 않으므로 세로 스크롤을 그대로 허용하고,
-     실제로 드래그가 시작될 때만 JS(handlePointerDown)에서 preventDefault로 막는다. */
-  touch-action: pan-y;
 }
 
 .timeline-block {
@@ -192,10 +214,6 @@
   justify-content: center;
   gap: 1px;
   overflow: hidden;
-  z-index: 9;
-  /* drag-track(z-index 8)가 항상 위에 떠서 블록 클릭을 가로채던 문제 때문에
-     블록 자체는 클릭을 통과시키고, 실제 조작이 필요한 admin-block-actions만 다시 받는다. */
-  pointer-events: none;
 }
 
 .entry-booking {
@@ -208,17 +226,31 @@
   border-left-color: var(--lock);
 }
 
+.timeline-block.is-clickable {
+  cursor: pointer;
+}
+
 .timeline-block.is-past {
-  opacity: 0.45;
-  filter: grayscale(0.7);
-  transition: opacity 0.3s ease, filter 0.3s ease;
+  opacity: 0.5;
+  filter: grayscale(0.6);
+}
+
+.timeline-block.is-compact {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.timeline-block.is-compact .admin-block-actions {
+  margin-top: 0;
+  margin-left: auto;
 }
 
 .draft-block {
   background: var(--accent-soft);
   border: 2px dashed var(--accent);
   border-left-width: 2px;
-  z-index: 10;
+  z-index: 3;
 }
 
 .draft-block .block-label,
@@ -245,18 +277,9 @@
 .admin-block-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   margin-top: 4px;
   flex-wrap: wrap;
-  pointer-events: auto;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.timeline-block:hover .admin-block-actions,
-.timeline-block.is-hovered .admin-block-actions,
-.timeline-block.is-adjusting .admin-block-actions {
-  opacity: 1;
 }
 
 .admin-block-actions button {
@@ -265,8 +288,8 @@
   color: var(--accent-strong);
   font-size: 11.5px;
   font-weight: 700;
-  padding: 7px 12px;
-  min-height: 30px;
+  padding: 5px 11px;
+  min-height: 28px;
   border-radius: 999px;
   cursor: pointer;
 }
@@ -274,47 +297,6 @@
 .admin-block-actions button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-
-.timeline-block.is-adjusting {
-  z-index: 10;
-  border: 2px dashed var(--accent);
-  background: var(--accent-soft);
-}
-
-.timeline-block.is-adjusting .block-label,
-.timeline-block.is-adjusting .block-time {
-  color: var(--accent-strong);
-}
-
-.resize-handle {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 28px;
-  cursor: ns-resize;
-  pointer-events: auto;
-  touch-action: none;
-}
-
-.resize-handle-top {
-  top: -14px;
-}
-
-.resize-handle-bottom {
-  bottom: -14px;
-}
-
-.resize-handle::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 28px;
-  height: 4px;
-  border-radius: 999px;
-  background: var(--accent);
 }
 
 .now-line {
@@ -335,7 +317,6 @@
   background: var(--busy);
   margin-left: -4px;
   box-shadow: 0 0 0 3px var(--paper);
-  animation: now-pulse 2s ease-in-out infinite;
 }
 
 .now-time {
@@ -348,14 +329,9 @@
   border-radius: 6px;
 }
 
-@keyframes now-pulse {
-  0%, 100% { box-shadow: 0 0 0 3px var(--paper); }
-  50% { box-shadow: 0 0 0 6px var(--busy-soft); }
-}
+/* ---- 하단 시트 ---- */
 
-/* ---- 예약 확정 패널 ---- */
-
-.confirm-panel {
+.sheet {
   position: fixed;
   left: 0;
   right: 0;
@@ -366,22 +342,131 @@
   box-shadow: var(--shadow-lg);
 }
 
-.confirm-panel-inner {
+.sheet-inner {
   max-width: 520px;
   margin: 0 auto;
-  padding: 20px 32px calc(20px + env(safe-area-inset-bottom, 0px));
+  padding: 18px 32px calc(20px + env(safe-area-inset-bottom, 0px));
 }
 
-.confirm-range {
-  margin: 0 0 16px;
-  font-size: 16px;
+.sheet-title {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.field-label {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+  background: var(--paper);
+}
+
+.stepper button {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent-strong);
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.stepper button:hover {
+  background: var(--accent-soft);
+}
+
+.stepper-value {
+  min-width: 78px;
+  text-align: center;
+  font-size: 14.5px;
   font-weight: 700;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 
-.confirm-duration {
+/* 시작 시각 직접 입력용 <input type="time">. 네이티브 피커를 그대로 쓰되 stepper-value와 같은 자리에 들어가도록 맞춤 */
+.stepper-input {
+  min-width: 78px;
+  text-align: center;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.stepper-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 12px 0 10px;
+}
+
+.preset {
+  flex: 1 1 auto;
+  min-width: 64px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
   font-size: 13px;
+  font-weight: 700;
+  padding: 9px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.preset.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.preset:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.sheet-range {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet-date {
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--ink-faint);
 }
@@ -415,9 +500,10 @@
   border: 1px solid var(--line);
   background: var(--surface);
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 11px 12px;
   font-size: 14px;
   color: var(--ink);
+  margin-bottom: 4px;
 }
 
 .member-grid {
@@ -471,9 +557,10 @@
   margin: 0 0 14px;
 }
 
-.confirm-actions {
+.sheet-actions {
   display: flex;
   gap: 10px;
+  margin-top: 12px;
 }
 
 .cancel-button,
@@ -518,7 +605,7 @@
   }
 
   .timetable-content {
-    padding: 28px 20px 48px;
+    padding: 22px 18px 48px;
   }
 
   .hour-label {
@@ -527,57 +614,63 @@
 
   .timeline-blocks,
   .now-line,
-  .drag-track,
-  .hover-slot,
   .minor-line {
     left: 46px;
   }
 
-  .confirm-panel-inner {
+  .sheet-inner {
     padding: 16px 20px calc(16px + env(safe-area-inset-bottom, 0px));
   }
 }
 
-.booking-tooltip {
+/* ---- 예약 블록 탭 시 참여자 정보 팝오버 ---- */
+
+.entry-popover {
   position: fixed;
-  z-index: 200;
+  z-index: 30;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 12px 14px;
   box-shadow: var(--shadow-md);
-  pointer-events: none;
-  min-width: 148px;
+  min-width: 160px;
+  max-width: 220px;
 }
 
-.tooltip-room {
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--ink-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin: 0 0 5px;
-}
-
-.tooltip-team {
-  font-size: 15px;
+.popover-team {
+  font-size: 14px;
   font-weight: 700;
   color: var(--ink);
   margin: 0 0 3px;
 }
 
-.tooltip-time {
-  font-size: 13px;
+.popover-time {
+  font-size: 12.5px;
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
-  margin: 0 0 6px;
+  margin: 0 0 8px;
 }
 
-.tooltip-members {
-  font-size: 12px;
-  color: var(--ink-faint);
-  margin: 0;
+.popover-members {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin: 0 0 10px;
   line-height: 1.5;
+}
+
+.popover-members.is-empty {
+  color: var(--ink-faint);
+}
+
+.popover-close {
+  border: none;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
 }
 
 @media (prefers-color-scheme: dark) {
