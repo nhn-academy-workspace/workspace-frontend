@@ -43,6 +43,36 @@ export function describeBookingTiming(entry: { startTime: string; endTime: strin
   return { phase: 'past', minutes: 0 }
 }
 
+export type RoomAvailabilityState = 'free' | 'busy' | 'lock' | 'closed'
+
+export interface RoomAvailability {
+  state: RoomAvailabilityState
+  until: string | null // 'HH:MM' — free: 다음 예약 시작 / busy·lock: 현재 항목 종료
+}
+
+const CLOSE_HOUR = 18
+
+/** 오늘 타임라인 항목들로 "지금" 이 방이 언제까지 비어있는지 / 언제 풀리는지 계산 */
+export function describeRoomAvailability(entries: TimetableEntry[], now: Date): RoomAvailability {
+  if (now.getHours() >= CLOSE_HOUR) return { state: 'closed', until: null }
+  const n = now.getTime()
+  const hhmm = (iso: string) => iso.slice(11, 16)
+
+  const current = entries.find((e) => {
+    const s = new Date(e.startTime).getTime()
+    const en = new Date(e.endTime).getTime()
+    return s <= n && n < en
+  })
+  if (current) {
+    return { state: current.type === 'LOCK' ? 'lock' : 'busy', until: hhmm(current.endTime) }
+  }
+
+  const next = entries
+    .filter((e) => new Date(e.startTime).getTime() > n)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime))[0]
+  return { state: 'free', until: next ? hhmm(next.startTime) : null }
+}
+
 export function formatMinutes(minutes: number): string {
   if (minutes < 60) return `${minutes}분`
   const h = Math.floor(minutes / 60)

@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { getRooms, type Room } from '../api/rooms'
-import { getMyTeamBookingsToday, describeBookingTiming, formatMinutes, type MyBookingEntry } from '../api/myBooking'
+import { getRooms, getRoomBookings, type Room, type TimetableEntry } from '../api/rooms'
+import {
+  describeBookingTiming,
+  describeRoomAvailability,
+  formatMinutes,
+  type MyBookingEntry,
+} from '../api/myBooking'
 import './MainPage.css'
 
 function toDateKey(date: Date): string {
@@ -31,13 +35,13 @@ const statusLabel: Record<Room['status'], string> = {
 export default function MainPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const reduceMotion = useReducedMotion()
 
   const [rooms, setRooms] = useState<Room[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const [myBookings, setMyBookings] = useState<MyBookingEntry[]>([])
+  const [entriesByRoom, setEntriesByRoom] = useState<Record<number, TimetableEntry[]>>({})
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
@@ -45,16 +49,30 @@ export default function MainPage() {
 
     const fetchRooms = () => {
       getRooms()
-        .then((data) => {
+        .then(async (data) => {
           if (cancelled) return
           setRooms(data)
+
+          const key = toDateKey(new Date())
+          const lists = await Promise.all(
+            data.map((room) => getRoomBookings(room.id, key).then((entries) => [room, entries] as const)),
+          )
+          if (cancelled) return
+
+          const byRoom: Record<number, TimetableEntry[]> = {}
+          for (const [room, entries] of lists) byRoom[room.id] = entries
+          setEntriesByRoom(byRoom)
           setError(null)
+
           if (user?.role === 'STUDENT' && user.teamName) {
-            getMyTeamBookingsToday(data, user.teamName, toDateKey(new Date()))
-              .then((bookings) => {
-                if (!cancelled) setMyBookings(bookings)
-              })
-              .catch(() => {})
+            const mine = lists
+              .flatMap(([room, entries]) =>
+                entries
+                  .filter((e) => e.type === 'BOOKING' && e.teamName === user.teamName)
+                  .map((e) => ({ ...e, roomId: room.id, roomName: room.name })),
+              )
+              .sort((a, b) => a.startTime.localeCompare(b.startTime))
+            setMyBookings(mine)
           }
         })
         .catch(() => {
@@ -93,33 +111,23 @@ export default function MainPage() {
           </svg>
           <span>회의실 예약</span>
         </Link>
-        <div className="main-user">
-          <Link to="/game" className="game-nav-btn" title="공룡 달리기">🦕</Link>
-          {user && (
-            <button type="button" className="user-chip" onClick={() => navigate('/my-page')}>
-              <span className="role-badge">{roleLabel[user.role] ?? user.role}</span>
-              {user.name}님
-            </button>
-          )}
-        </div>
+        {user && (
+          <button type="button" className="user-chip" onClick={() => navigate('/my-page')}>
+            <span className="role-badge">{roleLabel[user.role] ?? user.role}</span>
+            {user.name}
+          </button>
+        )}
       </header>
 
       <main className="main-content">
-        <motion.div
-          initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <h1>환영합니다, {user?.name ?? '사용자'}님</h1>
-          <p className="content-sub">지금 회의실 사용 현황을 확인하고 바로 예약해보세요.</p>
-        </motion.div>
+        <div className="fade-in">
+          <h1>{user?.name ? `${user.name}님` : '회의실 예약'}</h1>
+          {user?.teamName && <p className="content-sub">{user.teamName}</p>}
+        </div>
 
         {user?.role === 'STUDENT' && (
-          <motion.article
-            className="my-booking-banner"
-            initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.06, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          <article
+            className="my-booking-banner fade-in"
             onClick={() => navigate('/my-bookings')}
             role="button"
             tabIndex={0}
@@ -133,7 +141,7 @@ export default function MainPage() {
                 return (
                   <>
                     <span className="banner-eyebrow">
-                      {timing.phase === 'ongoing' ? '지금 진행 중' : '다음 예약'}
+                      {timing.phase === 'ongoing' ? '사용 중' : '다음 예약'}
                     </span>
                     <h2>
                       {upcomingOrOngoing.roomName} · {formatTime(upcomingOrOngoing.startTime)}–
@@ -150,20 +158,17 @@ export default function MainPage() {
             ) : (
               <>
                 <span className="banner-eyebrow">내 팀 예약</span>
-                <h2>오늘 예약된 회의가 없어요</h2>
-                <p>빈 회의실을 골라서 새로 예약해보세요.</p>
+                <h2>오늘 예약 없음</h2>
+                <p>아래에서 회의실을 선택해 예약하세요.</p>
               </>
             )}
-            <span className="banner-link">내 예약 보기 →</span>
-          </motion.article>
+            <span className="banner-link">내 예약 →</span>
+          </article>
         )}
 
         {user?.role === 'TA' && (
-          <motion.article
-            className="my-booking-banner admin-banner"
-            initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.06, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          <article
+            className="my-booking-banner admin-banner fade-in"
             onClick={() => navigate('/admin/teams')}
             role="button"
             tabIndex={0}
@@ -171,45 +176,22 @@ export default function MainPage() {
               if (e.key === 'Enter') navigate('/admin/teams')
             }}
           >
-            <span className="banner-eyebrow">TA 관리</span>
-            <h2>전체 팀 · 소속 학생 보기</h2>
-            <p>팀 구성과 학생 명단을 한눈에 확인하세요.</p>
+            <span className="banner-eyebrow">팀 관리</span>
+            <h2>팀 · 소속 학생</h2>
+            <p>팀 구성, 학생 명단 확인</p>
             <span className="banner-link">팀 관리 화면으로 →</span>
-          </motion.article>
+          </article>
         )}
 
-        <motion.article
-          className="game-promo-banner"
-          initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          onClick={() => navigate('/game')}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter') navigate('/game') }}
-        >
-          <div className="game-promo-left">
-            <span className="banner-eyebrow">지금 바로 도전</span>
-            <h2>🦕 공룡 달리기</h2>
-            <p>회의실 예약 기다리는 동안 점수 내봐요. 랭킹 1위는 누구?</p>
-            <span className="banner-link">게임 시작하기 →</span>
-          </div>
-          <div className="game-promo-dino" aria-hidden="true">🏆</div>
-        </motion.article>
-
-        {loading && <p className="state-message">불러오는 중...</p>}
+        {loading && <p className="state-message">불러오는 중</p>}
         {error && <p className="state-message is-error">{error}</p>}
 
         {!loading && !error && (
           <section className="room-grid">
-            {rooms.map((room, i) => (
-              <motion.article
+            {rooms.map((room) => (
+              <article
                 key={room.id}
                 className={`room-card status-${room.status.toLowerCase()}`}
-                initial={{ opacity: 0, y: reduceMotion ? 0 : 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 + i * 0.05, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                whileHover={reduceMotion ? undefined : { y: -4 }}
                 onClick={() => navigate(`/rooms/${room.id}`)}
                 role="button"
                 tabIndex={0}
@@ -224,11 +206,33 @@ export default function MainPage() {
                     {statusLabel[room.status]}
                   </span>
                 </div>
-                <p className="room-detail">탭해서 오늘 예약 현황 보기</p>
-              </motion.article>
+                {(() => {
+                  const avail = describeRoomAvailability(entriesByRoom[room.id] ?? [], now)
+                  const detail =
+                    avail.state === 'closed'
+                      ? '오늘 운영 종료'
+                      : avail.state === 'free'
+                        ? avail.until
+                          ? `${avail.until}까지 비어있음`
+                          : '오늘 남은 시간 모두 가능'
+                        : avail.state === 'lock'
+                          ? `${avail.until}까지 TA 업무`
+                          : `${avail.until}에 종료 예정`
+                  return <p className={`room-detail state-${avail.state}`}>{detail}</p>
+                })()}
+              </article>
             ))}
           </section>
         )}
+
+        <Link to="/game" className="game-link">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <rect x="1" y="4" width="14" height="8" rx="4" stroke="currentColor" strokeWidth="1.6" />
+            <path d="M4.5 8h2M5.5 7v2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            <circle cx="10.5" cy="8" r="1" fill="currentColor" />
+          </svg>
+          대기 중 미니게임
+        </Link>
       </main>
     </div>
   )
