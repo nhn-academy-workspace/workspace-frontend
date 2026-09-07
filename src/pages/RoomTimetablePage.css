@@ -202,17 +202,17 @@
   right: 0;
 }
 
+/* 블록은 항상 한 줄: [시간] [라벨]. 상세·조정은 클릭 팝오버로 (좁은 칸에 액션을 쑤셔넣지 않는다) */
 .timeline-block {
   position: absolute;
   left: 0;
   right: 0;
   border-radius: 8px;
   border-left: 3px solid transparent;
-  padding: 5px 10px;
+  padding: 4px 10px;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 1px;
+  align-items: baseline;
+  gap: 7px;
   overflow: hidden;
 }
 
@@ -235,30 +235,43 @@
   filter: grayscale(0.6);
 }
 
+.timeline-block.is-busy {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* 아주 짧은 칸(≈30분 이하): 글자만 줄이고 레이아웃은 동일 */
 .timeline-block.is-compact {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
+  padding: 2px 8px;
+  gap: 5px;
 }
 
-.timeline-block.is-compact .admin-block-actions {
-  margin-top: 0;
-  margin-left: auto;
+.timeline-block.is-compact .block-time {
+  font-size: 9.5px;
 }
 
+.timeline-block.is-compact .block-label {
+  font-size: 10.5px;
+}
+
+/* 기존 예약 위에 겹쳐도 확실히 구분되도록 불투명 채움 + 그림자로 띄운다.
+   순수 시각 피드백이라 클릭은 통과시켜 밑의 블록/타임라인이 받도록 한다. */
 .draft-block {
-  background: var(--accent-soft);
-  border: 2px dashed var(--accent);
+  background: var(--accent);
+  border: 2px dashed var(--accent-ink);
   border-left-width: 2px;
-  z-index: 3;
+  box-shadow: var(--shadow-md);
+  z-index: 6;
+  pointer-events: none;
 }
 
 .draft-block .block-label,
 .draft-block .block-time {
-  color: var(--accent-strong);
+  color: var(--accent-ink);
 }
 
 .block-time {
+  flex: none;
   font-size: 10.5px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -266,37 +279,14 @@
 }
 
 .block-label {
+  flex: 1;
+  min-width: 0;
   font-size: 12.5px;
   font-weight: 600;
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.admin-block-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  flex-wrap: wrap;
-}
-
-.admin-block-actions button {
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--accent-strong);
-  font-size: 11.5px;
-  font-weight: 700;
-  padding: 5px 11px;
-  min-height: 28px;
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.admin-block-actions button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 .now-line {
@@ -340,6 +330,18 @@
   background: var(--surface);
   border-top: 1px solid var(--line);
   box-shadow: var(--shadow-lg);
+  animation: slide-up 0.22s ease-out;
+}
+
+.sheet.is-closing {
+  animation: slide-down 0.19s ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes slide-down {
+  to {
+    transform: translateY(100%);
+  }
 }
 
 .sheet-inner {
@@ -366,6 +368,14 @@
   font-size: 13.5px;
   font-weight: 700;
   color: var(--ink-soft);
+}
+
+.field-static {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  padding-right: 12px;
 }
 
 .stepper {
@@ -395,33 +405,38 @@
   background: var(--accent-soft);
 }
 
-.stepper-value {
-  min-width: 78px;
-  text-align: center;
-  font-size: 14.5px;
-  font-weight: 700;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-
-/* 시작 시각 직접 입력용 <input type="time">. 네이티브 피커를 그대로 쓰되 stepper-value와 같은 자리에 들어가도록 맞춤 */
+/* 시작/종료 시각 입력 <input type="time"> — stepper 안에 값 표시 자리처럼 들어간다.
+   편집은 자유롭게(임의 분), 5분 격자 스냅은 blur/Enter 시 JS가 처리 */
 .stepper-input {
-  min-width: 78px;
+  width: 84px;
   text-align: center;
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
   border: none;
   background: none;
-  padding: 0;
+  padding: 4px 0;
   font-family: inherit;
-  cursor: pointer;
+  cursor: text;
+  color-scheme: light dark;
+}
+
+.stepper-input::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.stepper-input::-webkit-datetime-edit {
+  text-align: center;
+}
+
+.stepper-input:focus {
+  outline: none;
 }
 
 .stepper-input:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline-offset: 1px;
   border-radius: 6px;
 }
 
@@ -563,8 +578,8 @@
   margin-top: 12px;
 }
 
-.cancel-button,
-.confirm-button {
+.sheet-actions .cancel-button,
+.sheet-actions .confirm-button {
   flex: 1;
   border-radius: 10px;
   font-size: 15px;
@@ -574,23 +589,23 @@
   transition: background 0.15s ease, opacity 0.15s ease;
 }
 
-.cancel-button {
+.sheet-actions .cancel-button {
   border: 1px solid var(--line);
   background: var(--paper);
   color: var(--ink-soft);
 }
 
-.cancel-button:hover:not(:disabled) {
+.sheet-actions .cancel-button:hover:not(:disabled) {
   background: var(--line);
 }
 
-.confirm-button {
+.sheet-actions .confirm-button {
   border: none;
   background: var(--accent);
   color: var(--accent-ink);
 }
 
-.confirm-button:hover:not(:disabled) {
+.sheet-actions .confirm-button:hover:not(:disabled) {
   background: var(--accent-strong);
 }
 
@@ -623,7 +638,7 @@
   }
 }
 
-/* ---- 예약 블록 탭 시 참여자 정보 팝오버 ---- */
+/* ---- 예약 블록 hover/클릭 시 상세 팝오버 ---- */
 
 .entry-popover {
   position: fixed;
@@ -635,6 +650,17 @@
   box-shadow: var(--shadow-md);
   min-width: 160px;
   max-width: 220px;
+  animation: fade-in 0.12s ease-out;
+  /* hover로 뜬 상태는 정보만 — 클릭을 가로채지 않음 */
+  pointer-events: none;
+}
+
+.entry-popover.is-pinned {
+  pointer-events: auto;
+}
+
+.timeline-block.is-hovered {
+  box-shadow: inset 0 0 0 1.5px var(--ink-faint);
 }
 
 .popover-team {
@@ -671,6 +697,33 @@
   padding: 6px 12px;
   border-radius: 999px;
   cursor: pointer;
+}
+
+.popover-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.popover-actions button {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--accent-strong);
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 7px 10px;
+  min-height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.popover-actions button.is-danger {
+  color: var(--busy);
+}
+
+.popover-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 @media (prefers-color-scheme: dark) {
