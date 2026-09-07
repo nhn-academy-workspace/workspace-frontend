@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { motion, useReducedMotion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { getTelegramLinkStatus, requestTelegramLink, skipTelegramLink } from '../api/notifications'
 import './MyPage.css'
@@ -13,7 +12,6 @@ const roleLabel: Record<string, string> = {
 export default function MyPage() {
   const { user, setUser, logout } = useAuth()
   const navigate = useNavigate()
-  const reduceMotion = useReducedMotion()
 
   const [telegramLinking, setTelegramLinking] = useState(false)
   const [telegramLinkError, setTelegramLinkError] = useState<string | null>(null)
@@ -60,7 +58,7 @@ export default function MyPage() {
       const deepLink = await requestTelegramLink()
       window.open(deepLink, '_blank', 'noopener,noreferrer')
     } catch {
-      setTelegramLinkError('텔레그램 연동에 실패했습니다. 잠시 후 다시 시도해주세요.')
+      setTelegramLinkError('텔레그램 연동에 실패했습니다.')
     } finally {
       setTelegramLinking(false)
     }
@@ -89,12 +87,7 @@ export default function MyPage() {
       </header>
 
       <main className="my-page-content">
-        <motion.div
-          className="my-page-sections"
-          initial={{ opacity: 0, y: reduceMotion ? 0 : 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: 'easeOut' }}
-        >
+        <div className="my-page-sections fade-in">
           <section className="my-section">
             <div className="my-profile">
               <div className="my-profile-name">
@@ -111,7 +104,7 @@ export default function MyPage() {
               <p className="telegram-linked">연동 완료</p>
             ) : (
               <>
-                <p className="section-desc">예약 알림을 텔레그램으로 받으려면 연동해주세요.</p>
+                <p className="section-desc">연동하면 예약 시작·종료 알림을 텔레그램으로 받습니다.</p>
                 {telegramLinkError && <p className="my-error">{telegramLinkError}</p>}
                 <button
                   type="button"
@@ -119,11 +112,11 @@ export default function MyPage() {
                   onClick={handleTelegramLink}
                   disabled={telegramLinking}
                 >
-                  {telegramLinking ? '연동 중...' : '텔레그램 연동하기'}
+                  {telegramLinking ? '연동 중' : '텔레그램 연동'}
                 </button>
                 {!user?.telegramLinked && (
                   <button type="button" className="my-skip-button" onClick={handleSkipTelegramLink}>
-                    텔레그램이 없어요, 나중에 할게요
+                    나중에 하기
                   </button>
                 )}
               </>
@@ -147,7 +140,7 @@ export default function MyPage() {
               로그아웃
             </button>
           </section>
-        </motion.div>
+        </div>
       </main>
     </div>
   )

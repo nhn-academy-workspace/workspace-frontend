@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, useReducedMotion, AnimatePresence } from 'framer-motion'
 import { getAdminTeams, changeMemberTeam, callTarget, resetMemberPassword, type AdminTeam } from '../api/admin'
 import { useAuth } from '../context/AuthContext'
 import './AdminTeamsPage.css'
@@ -13,7 +12,6 @@ interface ResetConfirmTarget {
 export default function AdminTeamsPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const reduceMotion = useReducedMotion()
 
   const [teams, setTeams] = useState<AdminTeam[]>([])
   const [loading, setLoading] = useState(true)
@@ -62,14 +60,14 @@ export default function AdminTeamsPage() {
   }
 
   const handleCall = async (targetType: 'MEMBER' | 'TEAM', targetId: number, label: string) => {
-    const message = window.prompt(`${label}에게 보낼 메시지를 입력하세요`, '회의실로 와주세요')
+    const message = window.prompt(`${label}에게 보낼 메시지`, '회의실로 와 주세요.')
     if (!message) return
     const callKey = `${targetType}-${targetId}`
     setCalling(callKey)
     setCallError(null)
     try {
       await callTarget(targetType, targetId, message)
-      window.alert('호출을 보냈습니다.')
+      window.alert('호출했습니다.')
     } catch (err) {
       setCallError(err instanceof Error ? err.message : '호출에 실패했습니다.')
     } finally {
@@ -98,7 +96,7 @@ export default function AdminTeamsPage() {
         <button type="button" className="back-button" onClick={() => navigate('/main')}>
           ← 뒤로
         </button>
-        <h1>전체 팀 관리</h1>
+        <h1>팀 관리</h1>
       </header>
 
       <main className="admin-teams-content">
@@ -106,11 +104,11 @@ export default function AdminTeamsPage() {
           <p className="state-message is-error">TA 계정만 접근할 수 있습니다.</p>
         ) : (
           <>
-            {loading && <p className="state-message">불러오는 중...</p>}
+            {loading && <p className="state-message">불러오는 중</p>}
             {error && <p className="state-message is-error">{error}</p>}
 
             {!loading && !error && teams.length === 0 && (
-              <p className="state-message">등록된 팀이 없어요.</p>
+              <p className="state-message">등록된 팀이 없습니다.</p>
             )}
 
             {reassignError && <p className="state-message is-error">{reassignError}</p>}
@@ -118,14 +116,8 @@ export default function AdminTeamsPage() {
 
             {!loading && !error && teams.length > 0 && (
               <div className="admin-teams-list">
-                {teams.map((team, i) => (
-                  <motion.section
-                    key={team.teamId}
-                    className="admin-team-card"
-                    initial={{ opacity: 0, y: reduceMotion ? 0 : 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05, duration: 0.35, ease: 'easeOut' }}
-                  >
+                {teams.map((team) => (
+                  <section key={team.teamId} className="admin-team-card fade-in">
                     <div className="admin-team-top">
                       <h2>{team.name}</h2>
                       <span className="admin-team-count">{team.members.length}명</span>
@@ -140,7 +132,7 @@ export default function AdminTeamsPage() {
                     </div>
 
                     {team.members.length === 0 ? (
-                      <p className="admin-team-empty">소속 학생이 없어요.</p>
+                      <p className="admin-team-empty">소속 학생이 없습니다.</p>
                     ) : (
                       <ul className="admin-member-list">
                         {team.members.map((m) => {
@@ -171,7 +163,7 @@ export default function AdminTeamsPage() {
                                 disabled={target === team.teamId || reassigning === m.memberId}
                                 onClick={() => handleReassign(m.memberId, target)}
                               >
-                                {reassigning === m.memberId ? '이동 중...' : '이동'}
+                                {reassigning === m.memberId ? '이동 중' : '이동'}
                               </button>
                               <button
                                 type="button"
@@ -187,14 +179,14 @@ export default function AdminTeamsPage() {
                                 disabled={resetting === m.memberId}
                                 onClick={() => setResetConfirm({ memberId: m.memberId, name: m.name })}
                               >
-                                {resetting === m.memberId ? '초기화 중...' : 'PW 초기화'}
+                                {resetting === m.memberId ? '초기화 중' : '비밀번호 초기화'}
                               </button>
                             </li>
                           )
                         })}
                       </ul>
                     )}
-                  </motion.section>
+                  </section>
                 ))}
               </div>
             )}
@@ -203,57 +195,31 @@ export default function AdminTeamsPage() {
       </main>
 
       {/* 비밀번호 초기화 확인 모달 */}
-      <AnimatePresence>
-        {resetConfirm && (
-          <motion.div
+      {resetConfirm && (
+          <div
             className="admin-modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
             onClick={(e) => { if (e.target === e.currentTarget) setResetConfirm(null) }}
           >
-            <motion.div
-              className="admin-modal"
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-            >
-              <div className="admin-modal-icon">🔑</div>
+            <div className="admin-modal">
               <h3 className="admin-modal-title">비밀번호 초기화</h3>
               <p className="admin-modal-body">
-                <strong>{resetConfirm.name}</strong> 학생의 비밀번호를 초기화하시겠습니까?
+                <strong>{resetConfirm.name}</strong> 학생의 비밀번호를 초기화합니다.
               </p>
               <p className="admin-modal-sub">
-                초기화된 임시 비밀번호가 화면에 표시됩니다. 학생에게 직접 전달해주세요.
+                임시 비밀번호가 화면에 표시됩니다. 학생에게 직접 전달하세요.
               </p>
               <div className="admin-modal-actions">
                 <button type="button" className="admin-modal-cancel" onClick={() => setResetConfirm(null)}>취소</button>
                 <button type="button" className="admin-modal-confirm" onClick={handleResetConfirm}>초기화</button>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
 
       {/* 초기화 결과 모달 */}
-      <AnimatePresence>
-        {resetResult && (
-          <motion.div
-            className="admin-modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-          >
-            <motion.div
-              className="admin-modal"
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-            >
+      {resetResult && (
+          <div className="admin-modal-overlay">
+            <div className="admin-modal">
               <div className="admin-modal-icon success">✓</div>
               <h3 className="admin-modal-title">초기화 완료</h3>
               <p className="admin-modal-body">
@@ -261,15 +227,14 @@ export default function AdminTeamsPage() {
               </p>
               <div className="admin-temp-password">{resetResult.tempPassword}</div>
               <p className="admin-modal-sub">
-                학생에게 직접 전달하고, 화면을 닫은 후 비밀번호를 변경하도록 안내하세요.
+                학생에게 전달하고, 로그인 후 비밀번호를 변경하도록 안내하세요.
               </p>
               <div className="admin-modal-actions">
                 <button type="button" className="admin-modal-confirm" onClick={() => setResetResult(null)}>확인</button>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
     </div>
   )
 }

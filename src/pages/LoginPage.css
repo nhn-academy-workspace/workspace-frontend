@@ -8,8 +8,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(160deg, var(--accent) 0%, var(--accent-strong) 100%);
-  color: var(--accent-ink);
+  /* 히어로 패널은 라이트/다크 관계없이 동일한 브랜드 톤을 유지한다 */
+  background: linear-gradient(160deg, #5b52d6 0%, #3f37b0 100%);
+  color: #fff;
   padding: 48px;
 }
 
@@ -69,6 +70,7 @@
 
 .is-busy .room-dot {
   background: #ff9d94;
+  animation: pulse 2s ease-in-out infinite;
 }
 
 .room-name {
@@ -106,12 +108,6 @@
   font-weight: 700;
   margin: 0;
   color: var(--ink);
-}
-
-.login-form-sub {
-  margin: -8px 0 4px;
-  color: var(--ink-soft);
-  font-size: 14px;
 }
 
 .field {
@@ -261,6 +257,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
+  animation: fade-in 0.16s ease-out;
 }
 
 .reset-modal {
@@ -270,6 +267,7 @@
   max-width: 360px;
   width: 100%;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.22);
+  animation: pop-in 0.18s ease-out;
   display: flex;
   flex-direction: column;
   align-items: center;

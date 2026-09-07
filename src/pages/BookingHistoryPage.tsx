@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, useReducedMotion } from 'framer-motion'
 import { getMyTeamRoster } from '../api/teams'
 import { getTeamBookingHistory, type TeamBookingHistoryEntry, type TeamBookingStatus } from '../api/teamHistory'
 import './BookingHistoryPage.css'
@@ -44,7 +43,6 @@ function groupByDate(entries: TeamBookingHistoryEntry[]): [string, TeamBookingHi
 
 export default function BookingHistoryPage() {
   const navigate = useNavigate()
-  const reduceMotion = useReducedMotion()
 
   const [entries, setEntries] = useState<TeamBookingHistoryEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -86,26 +84,23 @@ export default function BookingHistoryPage() {
       </header>
 
       <main className="booking-history-content">
-        {loading && <p className="state-message">불러오는 중...</p>}
+        {loading && <p className="state-message">불러오는 중</p>}
         {error && <p className="state-message is-error">{error}</p>}
 
         {!loading && !error && entries.length === 0 && (
-          <p className="state-message">아직 예약 이력이 없어요.</p>
+          <p className="state-message">예약 이력이 없습니다.</p>
         )}
 
         {!loading &&
           !error &&
-          groups.map(([dateKey, dayEntries], gi) => (
+          groups.map(([dateKey, dayEntries]) => (
             <section key={dateKey} className="history-group">
               <h2 className="history-date">{formatDateLabel(dateKey)}</h2>
               <div className="history-list">
-                {dayEntries.map((entry, i) => (
-                  <motion.article
+                {dayEntries.map((entry) => (
+                  <article
                     key={entry.bookingId}
-                    className={`history-card status-${entry.status.toLowerCase()}`}
-                    initial={{ opacity: 0, y: reduceMotion ? 0 : 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: (gi * 3 + i) * 0.03, duration: 0.3, ease: 'easeOut' }}
+                    className={`history-card status-${entry.status.toLowerCase()} fade-in`}
                   >
                     <div className="history-card-top">
                       <h3>{entry.roomName}</h3>
@@ -119,7 +114,7 @@ export default function BookingHistoryPage() {
                         조정됨 · 원래 {formatTime(entry.originalStartTime)}–{formatTime(entry.originalEndTime)}
                       </p>
                     )}
-                  </motion.article>
+                  </article>
                 ))}
               </div>
             </section>

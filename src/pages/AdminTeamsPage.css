@@ -224,6 +224,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
+  animation: fade-in 0.16s ease-out;
 }
 
 .admin-modal {
@@ -233,6 +234,7 @@
   max-width: 360px;
   width: 100%;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.22);
+  animation: pop-in 0.18s ease-out;
   display: flex;
   flex-direction: column;
   align-items: center;
