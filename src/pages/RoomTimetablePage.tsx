@@ -25,11 +25,12 @@ const END_HOUR = 18
 const OPEN_HOUR = 8
 const OPEN_MINUTE = 30
 const STEP = 5 // 예약/락 최소 조정 단위(분)
-const HOUR_HEIGHT = 56 // px per hour — 하루(9시간)가 한 화면 가까이 들어오도록 압축
+const HOUR_HEIGHT = 72 // px per hour
 const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60
 const TOTAL_HEIGHT = (TOTAL_MINUTES / 60) * HOUR_HEIGHT
 const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i)
-const HALF_TICKS = Array.from({ length: TOTAL_MINUTES / 30 }, (_, i) => i * 30).filter(
+// 15분 간격 보조선 (정시 제외). :30 은 조금 진하게(is-half).
+const MINOR_TICKS = Array.from({ length: TOTAL_MINUTES / 15 }, (_, i) => i * 15).filter(
   (m) => m % 60 !== 0,
 )
 const MAX_BOOKING_MINUTES = 120
@@ -125,9 +126,10 @@ export default function RoomTimetablePage() {
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const [sheetClosing, setSheetClosing] = useState(false)
   const sheetCloseTimer = useRef<number | null>(null)
-  // 시각 입력창은 편집 중엔 자유롭게 두고(임의 분 허용), 커밋(blur/Enter) 시 5분 격자로 스냅한다.
-  const [startText, setStartText] = useState('')
-  const [endText, setEndText] = useState('')
+  // 드래그로 시간대를 그려 예약: 진행 중 범위 미리보기 + 제스처 상태
+  const [dragRange, setDragRange] = useState<Range | null>(null)
+  const dragInfo = useRef<{ startOffset: number; kind: SheetKind; moved: boolean } | null>(null)
+  const suppressClick = useRef(false)
   const [lockReason, setLockReason] = useState('')
   const [roster, setRoster] = useState<TeamMember[]>([])
   const [myMemberId, setMyMemberId] = useState<number | null>(null)
@@ -201,6 +203,8 @@ export default function RoomTimetablePage() {
     setSheet(null)
     cancelPendingClose()
     setInfoEntry(null)
+    setDragRange(null)
+    dragInfo.current = null
     fetchEntries()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, dateKey])
@@ -225,14 +229,6 @@ export default function RoomTimetablePage() {
     const timer = setInterval(() => setNow(new Date()), 60_000)
     return () => clearInterval(timer)
   }, [])
-
-  // 버튼/프리셋 등 외부 조작으로 sheet 시각이 바뀌면 입력창 텍스트도 맞춰준다
-  useEffect(() => {
-    if (!sheet) return
-    setStartText(minutesToHHMM(sheet.start + START_HOUR * 60))
-    setEndText(minutesToHHMM(sheet.end + START_HOUR * 60))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sheet?.start, sheet?.end, sheet?.kind, sheet?.entryId])
 
   // 하단 시트가 타임라인 아래쪽을 가리지 않도록 시트 높이만큼 여백 확보
   useEffect(() => {
@@ -302,7 +298,8 @@ export default function RoomTimetablePage() {
 
   const DEFAULT_DURATION = 60
 
-  const openSheet = (kind: SheetKind, rawStartOffset: number) => {
+  // rawEndOffset 를 주면(드래그) 그 길이로, 없으면 기본 1시간으로 종료를 잡는다.
+  const openSheet = (kind: SheetKind, rawStartOffset: number, rawEndOffset?: number) => {
     const occ = occupiedFor(kind, null)
     const maxDur = kind === 'book' ? MAX_BOOKING_MINUTES : TOTAL_MINUTES
     let start = clampNum(snap(rawStartOffset), 0, TOTAL_MINUTES - STEP)
@@ -311,13 +308,12 @@ export default function RoomTimetablePage() {
     for (const o of occ) if (start >= o.start && start < o.end) start = o.end
     start = clampNum(start, 0, TOTAL_MINUTES - STEP)
 
-    // 기본 1시간 — 단, 다음 일정 시작 전까지(30분 뒤에 예약이 있으면 30분)로 자름
-    let end = Math.min(
-      start + DEFAULT_DURATION,
-      start + maxDur,
-      TOTAL_MINUTES,
-      nextEntryStartAfter(start, null),
-    )
+    // 다음 일정 시작 전까지(30분 뒤에 예약이 있으면 30분)로 자름
+    const hardEnd = Math.min(start + maxDur, TOTAL_MINUTES, nextEntryStartAfter(start, null))
+    let end =
+      rawEndOffset != null
+        ? clampNum(snap(rawEndOffset), start + STEP, hardEnd)
+        : Math.min(start + DEFAULT_DURATION, hardEnd)
     end = Math.max(end, start + STEP)
 
     cancelPendingClose()
@@ -393,30 +389,42 @@ export default function RoomTimetablePage() {
     return ne
   }
 
-  const nudgeStart = (delta: number) =>
-    setSheet((s) => (s ? { ...s, start: resolveStart(s, s.start + delta) } : s))
-  const nudgeEnd = (delta: number) =>
-    setSheet((s) => (s ? { ...s, end: resolveEnd(s, s.end + delta) } : s))
   const setDuration = (mins: number) =>
     setSheet((s) => (s ? { ...s, end: resolveEnd(s, s.start + mins) } : s))
   const presetFits = (mins: number) =>
     !!sheet && resolveEnd(sheet, sheet.start + mins) === sheet.start + mins
 
-  // <input type="time"> 커밋(blur/Enter): 입력값을 보정하고, 입력창을 실제 반영된 값으로 되돌린다(예: 09:14 → 09:15).
-  const commitStart = () => {
-    if (!sheet) return
-    const p = parseHHMM(startText)
-    const ns = p == null ? sheet.start : resolveStart(sheet, offsetFromStart(p))
-    setSheet({ ...sheet, start: ns })
-    setStartText(minutesToHHMM(ns + START_HOUR * 60))
-  }
+  // 시각을 클릭하면 뜨는 드롭다운의 선택지 = 5분 격자 중 그 자리에 실제로 지정 가능한 값만.
+  // resolve*(sheet, m) === m 인지로 걸러서 격자·운영시간·최대길이·충돌 규칙을 그대로 재사용한다.
+  const startOptions = useMemo(() => {
+    if (!sheet || sheet.kind === 'extend') return []
+    const out: number[] = []
+    for (let m = 0; m <= TOTAL_MINUTES - STEP; m += STEP) {
+      if (resolveStart(sheet, m) === m) out.push(m)
+    }
+    if (!out.includes(sheet.start)) out.push(sheet.start)
+    return out.sort((a, b) => a - b)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheet, entries, isToday, nowMinutes])
 
-  const commitEnd = () => {
-    if (!sheet) return
-    const p = parseHHMM(endText)
-    const ne = p == null ? sheet.end : resolveEnd(sheet, offsetFromStart(p))
-    setSheet({ ...sheet, end: ne })
-    setEndText(minutesToHHMM(ne + START_HOUR * 60))
+  const endOptions = useMemo(() => {
+    if (!sheet) return []
+    const out: number[] = []
+    for (let m = STEP; m <= TOTAL_MINUTES; m += STEP) {
+      if (resolveEnd(sheet, m) === m) out.push(m)
+    }
+    if (!out.includes(sheet.end)) out.push(sheet.end)
+    return out.sort((a, b) => a - b)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheet, entries, isToday, nowMinutes])
+
+  const pickStart = (hhmm: string) => {
+    const p = parseHHMM(hhmm)
+    if (p != null) setSheet((s) => (s ? { ...s, start: resolveStart(s, offsetFromStart(p)) } : s))
+  }
+  const pickEnd = (hhmm: string) => {
+    const p = parseHHMM(hhmm)
+    if (p != null) setSheet((s) => (s ? { ...s, end: resolveEnd(s, offsetFromStart(p)) } : s))
   }
 
   // 시트가 열린 상태에서 타임라인을 누르면 draft를 그 시각으로 옮긴다 = '시작 지점을 다시 고르는' 동작.
@@ -445,7 +453,67 @@ export default function RoomTimetablePage() {
     return ((clientY - rect.top) / HOUR_HEIGHT) * 60
   }
 
+  // 드래그로 그린 두 지점을 격자·운영시간·최대길이·충돌(다음 블록 앞에서 멈춤) 반영한 범위로 보정
+  const clampDragRange = (kind: SheetKind, a: number, b: number): Range => {
+    const lo = minStartOffset(kind)
+    const occ = occupiedFor(kind, null)
+    let start = clampNum(snap(Math.min(a, b)), lo, TOTAL_MINUTES - STEP)
+    for (const o of occ) if (start >= o.start && start < o.end) start = o.end
+    start = clampNum(start, lo, TOTAL_MINUTES - STEP)
+    const maxDur = kind === 'book' ? MAX_BOOKING_MINUTES : TOTAL_MINUTES
+    let end = clampNum(snap(Math.max(a, b)), start + STEP, Math.min(start + maxDur, TOTAL_MINUTES))
+    for (const o of occ) if (o.start >= start && o.start < end) end = o.start
+    return { start, end }
+  }
+
+  const handleTimelinePointerDown = (e: React.PointerEvent) => {
+    if (sheet || (!canBook && !canLock)) return
+    if ((e.target as HTMLElement).closest('.timeline-block:not(.draft-block)')) return
+    const off = offsetFromPointer(e.clientY)
+    if (off == null) return
+    dragInfo.current = {
+      startOffset: clampNum(snap(off), 0, TOTAL_MINUTES - STEP),
+      kind: canLock ? 'lock' : 'book',
+      moved: false,
+    }
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      /* noop */
+    }
+  }
+
+  const handleTimelinePointerMove = (e: React.PointerEvent) => {
+    const d = dragInfo.current
+    if (!d) return
+    const off = offsetFromPointer(e.clientY)
+    if (off == null) return
+    if (Math.abs(off - d.startOffset) >= STEP) d.moved = true
+    if (d.moved) setDragRange(clampDragRange(d.kind, d.startOffset, off))
+  }
+
+  const endTimelineDrag = (e: React.PointerEvent) => {
+    const d = dragInfo.current
+    dragInfo.current = null
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {
+      /* noop */
+    }
+    if (d?.moved) {
+      const off = offsetFromPointer(e.clientY)
+      const r = off != null ? clampDragRange(d.kind, d.startOffset, off) : dragRange
+      suppressClick.current = true // 이어서 오는 click(=탭 예약)이 덧붙지 않도록
+      if (r) openSheet(d.kind, r.start, r.end)
+    }
+    setDragRange(null)
+  }
+
   const handleTimelineClick = (e: React.MouseEvent) => {
+    if (suppressClick.current) {
+      suppressClick.current = false
+      return
+    }
     setInfoEntry(null)
     const offset = offsetFromPointer(e.clientY)
     if (offset == null) return
@@ -675,7 +743,7 @@ export default function RoomTimetablePage() {
         )}
         {(canBook || canLock) && (
           <p className="drag-hint">
-            빈 시간대를 눌러 바로 지정{isTA ? ', 블록을 눌러 상세·조정' : ''}할 수 있습니다.
+            빈 시간대를 누르거나 드래그해서 지정{isTA ? ', 블록을 눌러 상세·조정' : ''}할 수 있습니다.
           </p>
         )}
 
@@ -689,6 +757,10 @@ export default function RoomTimetablePage() {
               className={`timeline${canBook || canLock ? ' is-tappable' : ''}`}
               style={{ height: TOTAL_HEIGHT }}
               onClick={handleTimelineClick}
+              onPointerDown={handleTimelinePointerDown}
+              onPointerMove={handleTimelinePointerMove}
+              onPointerUp={endTimelineDrag}
+              onPointerCancel={endTimelineDrag}
             >
               {HOURS.map((h, i) => (
                 <div key={h} className="hour-row" style={{ top: i * HOUR_HEIGHT }}>
@@ -697,8 +769,12 @@ export default function RoomTimetablePage() {
                 </div>
               ))}
 
-              {HALF_TICKS.map((m) => (
-                <div key={m} className="minor-line" style={{ top: offsetToTop(m) }} />
+              {MINOR_TICKS.map((m) => (
+                <div
+                  key={m}
+                  className={`minor-line${m % 30 === 0 ? ' is-half' : ''}`}
+                  style={{ top: offsetToTop(m) }}
+                />
               ))}
 
               <div className="timeline-blocks">
@@ -743,6 +819,22 @@ export default function RoomTimetablePage() {
                     <span className="block-label">{SHEET_META[sheet.kind].title}</span>
                   </div>
                 )}
+
+                {dragRange && !sheet && (
+                  <div
+                    className="timeline-block draft-block"
+                    style={{
+                      top: offsetToTop(dragRange.start),
+                      height: Math.max(offsetToTop(dragRange.end) - offsetToTop(dragRange.start), 20),
+                    }}
+                  >
+                    <span className="block-time">
+                      {minutesToHHMM(dragRange.start + START_HOUR * 60)}–
+                      {minutesToHHMM(dragRange.end + START_HOUR * 60)}
+                    </span>
+                    <span className="block-label">{canLock ? 'TA 업무' : '새 예약'}</span>
+                  </div>
+                )}
               </div>
 
               {nowTop !== null && (
@@ -771,53 +863,41 @@ export default function RoomTimetablePage() {
               {sheet.kind === 'extend' ? (
                 <span className="field-static">{minutesToHHMM(sheet.start + START_HOUR * 60)}</span>
               ) : (
-                <div className="stepper">
-                  <button type="button" onClick={() => nudgeStart(-STEP)} aria-label="5분 앞으로">
-                    −
-                  </button>
-                  <input
-                    type="time"
-                    className="stepper-input"
-                    min="09:00"
-                    max="17:55"
-                    value={startText}
-                    onChange={(e) => setStartText(e.target.value)}
-                    onBlur={commitStart}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') e.currentTarget.blur()
-                    }}
-                    aria-label="시작 시각"
-                  />
-                  <button type="button" onClick={() => nudgeStart(STEP)} aria-label="5분 뒤로">
-                    +
-                  </button>
-                </div>
+                <select
+                  className="time-select"
+                  value={minutesToHHMM(sheet.start + START_HOUR * 60)}
+                  onChange={(e) => pickStart(e.target.value)}
+                  aria-label="시작 시각"
+                >
+                  {startOptions.map((m) => {
+                    const t = minutesToHHMM(m + START_HOUR * 60)
+                    return (
+                      <option key={m} value={t}>
+                        {t}
+                      </option>
+                    )
+                  })}
+                </select>
               )}
             </div>
 
             <div className="field-row">
               <span className="field-label">{sheet.kind === 'extend' ? '새 종료' : '종료'}</span>
-              <div className="stepper">
-                <button type="button" onClick={() => nudgeEnd(-STEP)} aria-label="5분 앞으로">
-                  −
-                </button>
-                <input
-                  type="time"
-                  className="stepper-input"
-                  min="09:05"
-                  max="18:00"
-                  value={endText}
-                  onChange={(e) => setEndText(e.target.value)}
-                  onBlur={commitEnd}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') e.currentTarget.blur()
-                  }}
-                  aria-label="종료 시각"
-                />
-                <button type="button" onClick={() => nudgeEnd(STEP)} aria-label="5분 뒤로">
-                  +
-                </button>
-              </div>
+              <select
+                className="time-select"
+                value={minutesToHHMM(sheet.end + START_HOUR * 60)}
+                onChange={(e) => pickEnd(e.target.value)}
+                aria-label="종료 시각"
+              >
+                {endOptions.map((m) => {
+                  const t = minutesToHHMM(m + START_HOUR * 60)
+                  return (
+                    <option key={m} value={t}>
+                      {t}
+                    </option>
+                  )
+                })}
+              </select>
             </div>
 
             {sheet.kind !== 'extend' && (

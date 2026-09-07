@@ -39,7 +39,7 @@
 }
 
 .timetable-content {
-  max-width: 520px;
+  max-width: 600px;
   margin: 0 auto;
   padding: 28px 32px 64px;
 }
@@ -156,6 +156,8 @@
 
 .timeline.is-tappable {
   cursor: pointer;
+  /* 드래그로 시간대를 그릴 수 있게 — 타임라인 위에서는 세로 스크롤 제스처를 잡지 않음 */
+  touch-action: none;
 }
 
 .hour-row {
@@ -190,8 +192,12 @@
   right: 0;
   height: 1px;
   background: var(--line);
-  opacity: 0.4;
+  opacity: 0.28;
   pointer-events: none;
+}
+
+.minor-line.is-half {
+  opacity: 0.55;
 }
 
 .timeline-blocks {
@@ -345,7 +351,7 @@
 }
 
 .sheet-inner {
-  max-width: 520px;
+  max-width: 600px;
   margin: 0 auto;
   padding: 18px 32px calc(20px + env(safe-area-inset-bottom, 0px));
 }
@@ -378,66 +384,34 @@
   padding-right: 12px;
 }
 
-.stepper {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+/* 시작/종료 시각: 클릭하면 5분 격자 선택지 드롭다운이 바로 열린다(네이티브 select).
+   선택지는 그 자리에 실제로 지정 가능한 값만 JS가 추려서 넣는다. */
+.time-select {
+  appearance: none;
+  min-width: 118px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 3px;
-  background: var(--paper);
-}
-
-.stepper button {
-  width: 34px;
-  height: 34px;
-  border: none;
-  border-radius: 50%;
-  background: var(--surface);
-  color: var(--accent-strong);
-  font-size: 17px;
-  font-weight: 700;
-  cursor: pointer;
-  line-height: 1;
-}
-
-.stepper button:hover {
-  background: var(--accent-soft);
-}
-
-/* 시작/종료 시각 입력 <input type="time"> — stepper 안에 값 표시 자리처럼 들어간다.
-   편집은 자유롭게(임의 분), 5분 격자 스냅은 blur/Enter 시 JS가 처리 */
-.stepper-input {
-  width: 84px;
-  text-align: center;
+  background-color: var(--paper);
+  color: var(--ink);
   font-size: 15px;
   font-weight: 700;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-  border: none;
-  background: none;
-  padding: 4px 0;
   font-family: inherit;
-  cursor: text;
+  font-variant-numeric: tabular-nums;
+  padding: 9px 34px 9px 18px;
+  cursor: pointer;
   color-scheme: light dark;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%239aa0a6' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
 }
 
-.stepper-input::-webkit-calendar-picker-indicator {
-  display: none;
+.time-select:hover {
+  border-color: var(--accent);
 }
 
-.stepper-input::-webkit-datetime-edit {
-  text-align: center;
-}
-
-.stepper-input:focus {
-  outline: none;
-}
-
-.stepper-input:focus-visible {
+.time-select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
-  border-radius: 6px;
 }
 
 .preset-row {
@@ -728,6 +702,10 @@
 
 @media (prefers-color-scheme: dark) {
   .minor-line {
-    opacity: 0.65;
+    opacity: 0.45;
+  }
+
+  .minor-line.is-half {
+    opacity: 0.8;
   }
 }
