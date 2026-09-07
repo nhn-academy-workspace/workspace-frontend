@@ -1,6 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, useReducedMotion, AnimatePresence } from 'framer-motion'
 import { login, LoginError, resetPassword, PasswordResetError } from '../api/auth'
 import { getRooms, type Room } from '../api/rooms'
 import { useAuth } from '../context/AuthContext'
@@ -23,7 +22,6 @@ function BrandMark() {
 }
 
 function RoomPreview() {
-  const reduceMotion = useReducedMotion()
   const [rooms, setRooms] = useState<Room[]>([])
 
   useEffect(() => {
@@ -42,23 +40,14 @@ function RoomPreview() {
 
   return (
     <div className="room-preview">
-      {rooms.map((room, i) => {
+      {rooms.map((room) => {
         const busy = room.status !== 'AVAILABLE'
         return (
-          <motion.div
-            key={room.id}
-            className={`room-pill ${busy ? 'is-busy' : 'is-open'}`}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 + i * 0.12, duration: 0.5, ease: 'easeOut' }}
-          >
-            <span
-              className="room-dot"
-              style={busy && !reduceMotion ? { animation: 'pulse 2s ease-in-out infinite' } : undefined}
-            />
+          <div key={room.id} className={`room-pill ${busy ? 'is-busy' : 'is-open'}`}>
+            <span className="room-dot" />
             <span className="room-name">{room.name}</span>
             <span className="room-status">{roomStatusLabel[room.status]}</span>
-          </motion.div>
+          </div>
         )
       })}
     </div>
@@ -78,7 +67,6 @@ export default function LoginPage() {
 
   const { setUser } = useAuth()
   const navigate = useNavigate()
-  const reduceMotion = useReducedMotion()
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -127,67 +115,33 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <section className="login-brand">
-        <motion.div
-          className="login-brand-inner"
-          initial={{ opacity: 0, y: reduceMotion ? 0 : 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: 'easeOut' }}
-        >
+        <div className="login-brand-inner fade-in">
           <div className="brand-mark"><BrandMark /></div>
           <h1>NHN Academy<br />회의실 예약</h1>
-          <p className="brand-tagline">
-            담당 TA에게 물어보지 않아도,
-            <br />
-            바로 확인하고 예약하세요.
-          </p>
+          <p className="brand-tagline">비어 있는 회의실을 확인하고 바로 예약하세요.</p>
           <RoomPreview />
-        </motion.div>
+        </div>
       </section>
 
       <section className="login-form-panel">
-        <motion.form
-          className="login-form"
-          onSubmit={handleSubmit}
-          initial="hidden"
-          animate="visible"
-          variants={{
-            hidden: {},
-            visible: { transition: { staggerChildren: 0.07, delayChildren: 0.1 } },
-          }}
-        >
-          <motion.h2
-            variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
-          >
-            로그인
-          </motion.h2>
-          <motion.p
-            className="login-form-sub"
-            variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
-          >
-            부여받은 아이디와 비밀번호로 접속하세요.
-          </motion.p>
+        <form className="login-form fade-in" onSubmit={handleSubmit}>
+          <h2>로그인</h2>
 
-          <motion.div
-            className="field"
-            variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
-          >
+          <div className="field">
             <label htmlFor="loginId">아이디 (학번)</label>
             <input
               id="loginId"
               name="loginId"
               type="text"
               autoComplete="username"
-              placeholder="예: ATGG_03_000"
+              placeholder="ATGG_03_000"
               value={loginId}
               onChange={(e) => setLoginId(e.target.value)}
               disabled={submitting}
             />
-          </motion.div>
+          </div>
 
-          <motion.div
-            className="field"
-            variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
-          >
+          <div className="field">
             <label htmlFor="password">비밀번호</label>
             <div className="password-input">
               <input
@@ -195,7 +149,6 @@ export default function LoginPage() {
                 name="password"
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"
-                placeholder="비밀번호 입력"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={submitting}
@@ -209,92 +162,44 @@ export default function LoginPage() {
                 {showPassword ? '숨기기' : '표시'}
               </button>
             </div>
-          </motion.div>
+          </div>
 
-          <AnimatePresence>
-            {error && (
-              <motion.div
-                className="form-error"
-                role="alert"
-                initial={{ opacity: 0, height: 0 }}
-                animate={
-                  reduceMotion
-                    ? { opacity: 1, height: 'auto' }
-                    : { opacity: 1, height: 'auto', x: [0, -8, 8, -5, 5, 0] }
-                }
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.4 }}
-              >
-                {error}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {error && (
+            <div className="form-error" role="alert">
+              {error}
+            </div>
+          )}
 
-          <AnimatePresence>
-            {failCount >= 1 && (
-              <motion.div
-                className="reset-hint"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3, ease: 'easeOut' }}
-              >
-                <button
-                  type="button"
-                  className="reset-password-link"
-                  onClick={openResetConfirm}
-                >
-                  비밀번호를 잊으셨나요?
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {failCount >= 1 && (
+            <div className="reset-hint">
+              <button type="button" className="reset-password-link" onClick={openResetConfirm}>
+                비밀번호를 잊으셨나요?
+              </button>
+            </div>
+          )}
 
-          <motion.button
-            type="submit"
-            className="submit-button"
-            disabled={submitting}
-            variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
-            whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-          >
+          <button type="submit" className="submit-button" disabled={submitting}>
             {submitting ? <span className="spinner" aria-hidden="true" /> : '로그인'}
-          </motion.button>
+          </button>
 
-          <motion.p
-            className="login-hint"
-            variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
-          >
-            계정은 회원가입이 아닌, 담당 TA로부터 발급받은 아이디·비밀번호를 사용합니다.
-          </motion.p>
-        </motion.form>
+          <p className="login-hint">계정은 담당 TA가 발급합니다. 별도의 회원가입은 없습니다.</p>
+        </form>
       </section>
 
-      <AnimatePresence>
-        {resetStep !== 'idle' && (
-          <motion.div
+      {resetStep !== 'idle' && (
+          <div
             className="reset-modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
             onClick={(e) => { if (e.target === e.currentTarget) closeReset() }}
           >
-            <motion.div
-              className="reset-modal"
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              transition={{ duration: 0.22, ease: 'easeOut' }}
-            >
+            <div className="reset-modal">
               {resetStep === 'confirm' && (
                 <>
-                  <div className="reset-modal-icon">🔑</div>
                   <h3 className="reset-modal-title">비밀번호 초기화</h3>
                   <p className="reset-modal-body">
-                    <strong>{loginId}</strong> 계정의 비밀번호를 초기화하시겠습니까?
+                    <strong>{loginId}</strong> 계정의 비밀번호를 초기화합니다.
                   </p>
                   <p className="reset-modal-sub">
-                    초기화된 임시 비밀번호는 연동된 텔레그램으로 발송됩니다.
+                    임시 비밀번호는 연동된 텔레그램으로 발송됩니다.
                   </p>
                   <div className="reset-modal-actions">
                     <button type="button" className="reset-modal-cancel" onClick={closeReset}>취소</button>
@@ -306,7 +211,7 @@ export default function LoginPage() {
               {resetStep === 'loading' && (
                 <div className="reset-modal-loading">
                   <span className="spinner reset-spinner" aria-hidden="true" />
-                  <p className="reset-modal-body">처리 중...</p>
+                  <p className="reset-modal-body">처리 중</p>
                 </div>
               )}
 
@@ -315,10 +220,10 @@ export default function LoginPage() {
                   <div className="reset-modal-icon success">✓</div>
                   <h3 className="reset-modal-title">전송 완료</h3>
                   <p className="reset-modal-body">
-                    텔레그램으로 임시 비밀번호가 전송되었습니다.
+                    텔레그램으로 임시 비밀번호를 보냈습니다.
                   </p>
                   <p className="reset-modal-sub">
-                    임시 비밀번호로 로그인 후 새 비밀번호로 변경해주세요.
+                    임시 비밀번호로 로그인한 뒤 새 비밀번호로 변경하세요.
                   </p>
                   <div className="reset-modal-actions">
                     <button type="button" className="reset-modal-confirm" onClick={closeReset}>확인</button>
@@ -334,7 +239,7 @@ export default function LoginPage() {
                     텔레그램이 연동되어 있지 않아 임시 비밀번호를 전송할 수 없습니다.
                   </p>
                   <p className="reset-modal-sub">
-                    담당 TA에게 직접 문의하여 비밀번호를 초기화받으세요.
+                    담당 TA에게 문의해 비밀번호를 초기화하세요.
                   </p>
                   <div className="reset-modal-actions">
                     <button type="button" className="reset-modal-confirm" onClick={closeReset}>확인</button>
@@ -355,10 +260,9 @@ export default function LoginPage() {
                   </div>
                 </>
               )}
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
     </div>
   )
 }

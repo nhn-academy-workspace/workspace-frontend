@@ -90,35 +90,33 @@
 }
 
 .main-content h1 {
-  font-size: 28px;
+  font-size: 23px;
   font-weight: 700;
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   color: var(--ink);
   text-wrap: balance;
 }
 
 .content-sub {
   color: var(--ink-soft);
-  font-size: 15px;
-  margin: 0 0 36px;
+  font-size: 14px;
+  margin: 0 0 28px;
 }
 
 .my-booking-banner {
   position: relative;
   display: block;
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+  background: var(--accent);
   color: var(--accent-ink);
-  border-radius: 20px;
-  padding: 28px 32px;
-  margin-bottom: 32px;
+  border-radius: 16px;
+  padding: 24px 28px;
+  margin-bottom: 28px;
   cursor: pointer;
-  box-shadow: var(--shadow-md);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition: box-shadow 0.18s ease;
 }
 
 .my-booking-banner:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .my-booking-banner:focus-visible {
@@ -148,15 +146,15 @@
 }
 
 .admin-banner {
-  background: linear-gradient(135deg, var(--ink-soft) 0%, var(--ink) 100%);
+  background: var(--ink);
 }
 
 .banner-link {
   display: inline-block;
-  margin-top: 16px;
-  font-size: 13.5px;
-  font-weight: 700;
-  opacity: 0.95;
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.9;
 }
 
 .room-grid {
@@ -168,15 +166,15 @@
 .room-card {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 22px;
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow 0.2s ease;
+  border-radius: 14px;
+  padding: 20px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
   cursor: pointer;
 }
 
 .room-card:hover {
-  box-shadow: var(--shadow-md);
+  border-color: var(--ink-faint);
+  box-shadow: var(--shadow-sm);
 }
 
 .room-card:focus-visible {
@@ -241,8 +239,26 @@
 
 .room-detail {
   color: var(--ink-soft);
-  font-size: 14px;
+  font-size: 13.5px;
+  font-weight: 600;
   margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.room-detail.state-free {
+  color: var(--ok);
+}
+
+.room-detail.state-busy {
+  color: var(--busy);
+}
+
+.room-detail.state-lock {
+  color: var(--lock);
+}
+
+.room-detail.state-closed {
+  color: var(--ink-faint);
 }
 
 @media (max-width: 640px) {
@@ -259,89 +275,27 @@
   }
 }
 
-/* ── Game promo banner ───────────────────────────────────── */
-
-.game-promo-banner {
-  position: relative;
-  display: flex;
+.game-link {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-  color: #fff;
-  border-radius: 20px;
-  padding: 24px 28px;
-  margin-bottom: 28px;
-  cursor: pointer;
-  box-shadow: 0 4px 20px rgba(22, 163, 74, 0.28);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
-  overflow: hidden;
-}
-
-.game-promo-banner::before {
-  content: '';
-  position: absolute;
-  top: -30px;
-  right: 70px;
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
-  pointer-events: none;
-}
-
-.game-promo-banner:hover {
-  box-shadow: 0 8px 28px rgba(22, 163, 74, 0.38);
-  transform: translateY(-2px);
-}
-
-.game-promo-banner:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 3px;
-}
-
-.game-promo-banner .banner-eyebrow {
-  color: #bbf7d0;
-}
-
-.game-promo-banner h2 {
-  font-size: 22px;
+  gap: 6px;
+  margin-top: 28px;
+  padding: 8px 15px;
+  font-size: 13px;
   font-weight: 700;
-  margin: 0 0 6px;
-  color: #fff;
-}
-
-.game-promo-banner p {
-  font-size: 14px;
-  opacity: 0.88;
-  margin: 0;
-  color: #fff;
-}
-
-.game-promo-left {
-  flex: 1;
-}
-
-.game-promo-dino {
-  font-size: 48px;
-  flex-shrink: 0;
-  margin-left: 16px;
-  line-height: 1;
-  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.18));
-}
-
-.game-nav-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  font-size: 18px;
+  color: var(--ok);
+  background: var(--ok-soft);
+  border: 1px solid transparent;
+  border-radius: 999px;
   text-decoration: none;
-  transition: background 0.15s;
-  line-height: 1;
+  transition: transform 0.12s ease, box-shadow 0.15s ease;
 }
 
-.game-nav-btn:hover {
-  background: var(--paper);
+.game-link svg {
+  color: var(--ok);
+}
+
+.game-link:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--ok-soft);
 }

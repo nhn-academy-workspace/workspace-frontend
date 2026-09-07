@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { motion, useReducedMotion } from 'framer-motion'
 import { changePassword, PasswordChangeError } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
 import './ChangePasswordPage.css'
@@ -8,7 +7,6 @@ import './ChangePasswordPage.css'
 export default function ChangePasswordPage() {
   const { user, setUser } = useAuth()
   const navigate = useNavigate()
-  const reduceMotion = useReducedMotion()
   const forced = user?.mustChangePassword ?? false
 
   const [currentPassword, setCurrentPassword] = useState('')
@@ -72,14 +70,10 @@ export default function ChangePasswordPage() {
       </header>
 
       <main className="change-password-content">
-        <motion.div
-          initial={{ opacity: 0, y: reduceMotion ? 0 : 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: 'easeOut' }}
-        >
+        <div className="fade-in">
           {forced && (
             <p className="change-password-notice">
-              처음 로그인하셨네요! 발급받은 임시 비밀번호를 계속 쓰기 전에, 원하는 비밀번호로 바꿔주세요.
+              임시 비밀번호로 로그인했습니다. 계속 사용하려면 새 비밀번호로 변경하세요.
             </p>
           )}
 
@@ -128,10 +122,10 @@ export default function ChangePasswordPage() {
             )}
 
             <button type="submit" className="submit-button" disabled={submitting}>
-              {submitting ? '변경 중...' : '비밀번호 변경'}
+              {submitting ? '변경 중' : '비밀번호 변경'}
             </button>
           </form>
-        </motion.div>
+        </div>
       </main>
     </div>
   )

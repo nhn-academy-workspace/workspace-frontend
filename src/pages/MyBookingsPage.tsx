@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { getRoomBookings } from '../api/rooms'
 import { getTeamBookingHistory, type TeamBookingHistoryEntry } from '../api/teamHistory'
 import { describeBookingTiming, formatMinutes } from '../api/myBooking'
@@ -12,7 +11,7 @@ import './MyBookingsPage.css'
 
 const CLOSE_MINUTES = 18 * 60
 const DAILY_CAP_MINUTES = 240
-const EXTEND_WINDOW = 15
+const MAX_BOOKING_MINUTES = 120 // 1회 예약(연장 포함) 최대 2시간
 const EXTEND_STEP = 5 // 백엔드 연장 최소 단위와 일치
 const DURATION_OPTIONS = [5, 10, 15, 30, 45, 60]
 
@@ -52,7 +51,6 @@ function sortRank(entry: TeamBookingHistoryEntry, now: Date): number {
 export default function MyBookingsPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const reduceMotion = useReducedMotion()
 
   const [bookings, setBookings] = useState<TeamBookingHistoryEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -119,7 +117,7 @@ export default function MyBookingsPage() {
 
       let maxEndAbs = CLOSE_MINUTES
       for (const e of roomEntries) {
-        if (e.type === 'BOOKING' && e.id === entry.bookingId) continue
+        if (e.id === entry.bookingId && e.type === 'BOOKING') continue
         const s = minutesOfDay(e.startTime)
         if (s > entryEnd && s < maxEndAbs) maxEndAbs = s
       }
@@ -128,7 +126,12 @@ export default function MyBookingsPage() {
         .filter((b) => b.status !== 'CANCELLED')
         .reduce((sum, b) => sum + (minutesOfDay(b.endTime) - minutesOfDay(b.startTime)), 0)
       const capRemaining = Math.max(DAILY_CAP_MINUTES - usedToday, 0)
-      maxEndAbs = Math.min(maxEndAbs, entryEnd + capRemaining)
+      // 다음 일정 / 18:00 / 팀 일일 4시간 / 이 예약 시작으로부터 최대 2시간
+      maxEndAbs = Math.min(
+        maxEndAbs,
+        entryEnd + capRemaining,
+        minutesOfDay(entry.startTime) + MAX_BOOKING_MINUTES,
+      )
 
       const rawMax = maxEndAbs - entryEnd
       setExtendMax(Math.max(Math.floor(rawMax / EXTEND_STEP) * EXTEND_STEP, 0))
@@ -148,7 +151,7 @@ export default function MyBookingsPage() {
       await fetchBookings()
       fetchUsage()
     } catch (err) {
-      setActionError(err instanceof BookingError ? err.message : '연장에 실패했습니다. 잠시 후 다시 시도해주세요.')
+      setActionError(err instanceof BookingError ? err.message : '연장에 실패했습니다.')
     } finally {
       setActionSubmitting(null)
     }
@@ -163,14 +166,14 @@ export default function MyBookingsPage() {
       await fetchBookings()
       fetchUsage()
     } catch (err) {
-      setActionError(err instanceof BookingError ? err.message : '조기 반납에 실패했습니다. 잠시 후 다시 시도해주세요.')
+      setActionError(err instanceof BookingError ? err.message : '조기 반납에 실패했습니다.')
     } finally {
       setActionSubmitting(null)
     }
   }
 
   const handleCancel = async (entry: TeamBookingHistoryEntry) => {
-    if (!window.confirm('이 예약을 취소할까요?')) return
+    if (!window.confirm('이 예약을 취소하시겠습니까?')) return
     setActionSubmitting(entry.bookingId)
     setActionError(null)
     try {
@@ -179,7 +182,7 @@ export default function MyBookingsPage() {
       await fetchBookings()
       fetchUsage()
     } catch (err) {
-      setActionError(err instanceof BookingError ? err.message : '예약 취소에 실패했습니다. 잠시 후 다시 시도해주세요.')
+      setActionError(err instanceof BookingError ? err.message : '예약 취소에 실패했습니다.')
     } finally {
       setActionSubmitting(null)
     }
@@ -209,48 +212,57 @@ export default function MyBookingsPage() {
               <div className="usage-summary">
                 <div className="usage-summary-top">
                   <span>오늘 사용 시간</span>
-                  <span>{formatMinutes(usage.usedMinutes)} / {formatMinutes(DAILY_CAP_MINUTES)}</span>
+                  <span>
+                    {formatMinutes(usage.usedMinutes)} / {formatMinutes(DAILY_CAP_MINUTES)}
+                  </span>
                 </div>
                 <div className="usage-bar">
                   <div
                     className="usage-bar-fill"
-                    style={{ width: `${Math.min((usage.usedMinutes / DAILY_CAP_MINUTES) * 100, 100)}%` }}
+                    style={{
+                      width: `${Math.min((usage.usedMinutes / DAILY_CAP_MINUTES) * 100, 100)}%`,
+                    }}
                   />
                 </div>
                 <p className="usage-summary-remaining">
-                  남은 {formatMinutes(Math.max(usage.remainingMinutes, 0))}
+                  {formatMinutes(Math.max(usage.remainingMinutes, 0))} 남음
                 </p>
               </div>
             )}
 
-            {loading && <p className="state-message">불러오는 중...</p>}
+            {loading && <p className="state-message">불러오는 중</p>}
             {error && <p className="state-message is-error">{error}</p>}
 
             {!loading && !error && bookings.length === 0 && (
-              <p className="state-message">오늘 예약된 회의가 없어요.</p>
+              <p className="state-message">오늘 예약이 없습니다.</p>
             )}
 
-            {!loading && !error && actionError && <p className="state-message is-error">{actionError}</p>}
+            {!loading && !error && actionError && (
+              <p className="state-message is-error">{actionError}</p>
+            )}
 
             {!loading && !error && sortedBookings.length > 0 && (
               <div className="my-bookings-list">
-                {sortedBookings.map((entry, i) => {
+                {sortedBookings.map((entry) => {
                   const isCancelled = entry.status === 'CANCELLED'
                   const timing = describeBookingTiming(entry, now)
+                  const bookedNow =
+                    !isCancelled && entry.status === 'BOOKED' && timing.phase !== 'past'
+                  // 아직 2시간(=시작+120분) 미만이면 연장 여지 있음 — 실제 한도는 openExtend에서 계산
                   const canOfferExtend =
-                    !isCancelled && timing.phase === 'ongoing' && timing.minutes <= EXTEND_WINDOW && entry.status === 'BOOKED'
-                  const canOfferEarlyReturn = !isCancelled && timing.phase === 'ongoing' && entry.status === 'BOOKED'
-                  const canOfferCancel = !isCancelled && timing.phase === 'upcoming' && entry.status === 'BOOKED'
+                    bookedNow &&
+                    (timing.phase === 'ongoing' || timing.phase === 'upcoming') &&
+                    minutesOfDay(entry.endTime) - minutesOfDay(entry.startTime) <
+                      MAX_BOOKING_MINUTES
+                  const canOfferEarlyReturn = bookedNow && timing.phase === 'ongoing'
+                  const canOfferCancel = bookedNow && timing.phase === 'upcoming'
                   const submitting = actionSubmitting === entry.bookingId
                   const isExtending = extendingId === entry.bookingId
 
                   return (
-                    <motion.article
+                    <article
                       key={entry.bookingId}
-                      className={`booking-card phase-${isCancelled ? 'cancelled' : timing.phase}`}
-                      initial={{ opacity: 0, y: reduceMotion ? 0 : 14 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.06, duration: 0.35, ease: 'easeOut' }}
+                      className={`booking-card phase-${isCancelled ? 'cancelled' : timing.phase} fade-in`}
                     >
                       <div className="booking-card-top">
                         <h2>{entry.roomName}</h2>
@@ -260,16 +272,24 @@ export default function MyBookingsPage() {
                       </div>
 
                       <p className="booking-status">
-                        {isCancelled && '취소된 예약'}
-                        {!isCancelled && timing.phase === 'ongoing' && `지금 진행 중 · ${formatMinutes(timing.minutes)} 후 종료`}
-                        {!isCancelled && timing.phase === 'upcoming' && `${formatMinutes(timing.minutes)} 후 시작`}
+                        {isCancelled && '취소됨'}
+                        {!isCancelled &&
+                          timing.phase === 'ongoing' &&
+                          `사용 중 · ${formatMinutes(timing.minutes)} 후 종료`}
+                        {!isCancelled &&
+                          timing.phase === 'upcoming' &&
+                          `${formatMinutes(timing.minutes)} 후 시작`}
                         {!isCancelled && timing.phase === 'past' && '종료됨'}
                       </p>
 
                       {(canOfferExtend || canOfferEarlyReturn || canOfferCancel) && (
                         <div className="booking-actions">
                           {canOfferExtend && (
-                            <button type="button" onClick={() => openExtend(entry)} disabled={submitting}>
+                            <button
+                              type="button"
+                              onClick={() => openExtend(entry)}
+                              disabled={submitting}
+                            >
                               연장
                             </button>
                           )}
@@ -286,7 +306,7 @@ export default function MyBookingsPage() {
                           {canOfferCancel && (
                             <button
                               type="button"
-                              className="cancel-button"
+                              className="is-danger"
                               onClick={() => handleCancel(entry)}
                               disabled={submitting}
                             >
@@ -296,44 +316,40 @@ export default function MyBookingsPage() {
                         </div>
                       )}
 
-                      <AnimatePresence>
-                        {isExtending && (
-                          <motion.div
-                            className="extend-options"
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.2, ease: 'easeOut' }}
-                          >
-                            {extendLoading && <span className="extend-hint">확인 중...</span>}
-                            {!extendLoading && extendMax !== null && extendMax < EXTEND_STEP && (
-                              <span className="extend-hint">지금은 더 연장할 수 있는 시간이 없어요.</span>
-                            )}
-                            {!extendLoading &&
-                              extendMax !== null &&
-                              extendMax >= EXTEND_STEP &&
-                              DURATION_OPTIONS.map((m) => (
-                                <button
-                                  key={m}
-                                  type="button"
-                                  className="chip"
-                                  disabled={m > extendMax || submitting}
-                                  onClick={() => confirmExtend(entry, m)}
-                                >
-                                  +{m}분
-                                </button>
-                              ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </motion.article>
+                      {isExtending && (
+                        <div className="extend-options">
+                          {extendLoading && <span className="extend-hint">확인 중</span>}
+                          {!extendLoading && extendMax !== null && extendMax < EXTEND_STEP && (
+                            <span className="extend-hint">연장 가능한 시간이 없습니다.</span>
+                          )}
+                          {!extendLoading &&
+                            extendMax !== null &&
+                            extendMax >= EXTEND_STEP &&
+                            DURATION_OPTIONS.map((m) => (
+                              <button
+                                key={m}
+                                type="button"
+                                className="chip"
+                                disabled={m > extendMax || submitting}
+                                onClick={() => confirmExtend(entry, m)}
+                              >
+                                +{m}분
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </article>
                   )
                 })}
               </div>
             )}
 
-            <button type="button" className="history-link" onClick={() => navigate('/bookings/history')}>
-              지난 예약 이력 보기 →
+            <button
+              type="button"
+              className="history-link"
+              onClick={() => navigate('/bookings/history')}
+            >
+              지난 예약 이력 →
             </button>
           </>
         )}

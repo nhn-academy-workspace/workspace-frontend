@@ -61,7 +61,7 @@ export async function createLock(payload: CreateLockPayload): Promise<LockResult
     credentials: 'include',
     body: JSON.stringify(payload),
   })
-  return handle(res, '락 생성에 실패했습니다.')
+  return handle(res, 'TA 업무 등록에 실패했습니다.')
 }
 
 export async function updateLock(lockId: number, payload: CreateLockPayload): Promise<LockResult> {
@@ -71,7 +71,7 @@ export async function updateLock(lockId: number, payload: CreateLockPayload): Pr
     credentials: 'include',
     body: JSON.stringify(payload),
   })
-  return handle(res, '락 조정에 실패했습니다.')
+  return handle(res, 'TA 업무 조정에 실패했습니다.')
 }
 
 export async function deleteLock(lockId: number): Promise<void> {
@@ -81,6 +81,6 @@ export async function deleteLock(lockId: number): Promise<void> {
   })
   if (!res.ok) {
     const body = await res.json().catch(() => null)
-    throw new AdminActionError(body?.message ?? '락 취소에 실패했습니다.')
+    throw new AdminActionError(body?.message ?? 'TA 업무 삭제에 실패했습니다.')
   }
 }

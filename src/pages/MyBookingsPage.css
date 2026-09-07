@@ -172,13 +172,15 @@
 }
 
 .booking-actions button {
+  flex: 1 1 0;
+  min-width: 0;
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--accent-strong);
   font-size: 13px;
   font-weight: 700;
-  padding: 8px 16px;
-  border-radius: 999px;
+  padding: 9px 12px;
+  border-radius: 10px;
   cursor: pointer;
   transition: background 0.15s ease, opacity 0.15s ease;
 }
@@ -192,19 +194,13 @@
   cursor: not-allowed;
 }
 
-.booking-actions .early-return-button {
+.booking-actions .early-return-button,
+.booking-actions .is-danger {
   color: var(--busy);
 }
 
-.booking-actions .early-return-button:hover:not(:disabled) {
-  background: var(--busy-soft);
-}
-
-.booking-actions .cancel-button {
-  color: var(--busy);
-}
-
-.booking-actions .cancel-button:hover:not(:disabled) {
+.booking-actions .early-return-button:hover:not(:disabled),
+.booking-actions .is-danger:hover:not(:disabled) {
   background: var(--busy-soft);
 }
 
