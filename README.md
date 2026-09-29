@@ -1,32 +1,15 @@
-# React + TypeScript + Vite
+# workspace-frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+**Workspace Booking** — 회의실 예약 및 미니게임 서비스 (2인 개발)
 
-Currently, two official plugins are available:
+## 화면
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- 로그인 / 비밀번호 변경
+- 회의실 예약 타임테이블, 내 예약·예약 이력
+- 텔레그램 미연동 시 마이페이지로 안내
+- 관리자 — 팀 관리, 호출, 시간 잠금
+- 대기 중 미니게임
 
-## React Compiler
+## 기술 스택
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+React 19, TypeScript, Vite
